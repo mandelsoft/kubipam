@@ -1,0 +1,4 @@
+
+# name=kubipam
+
+export GOROOT="$(goroot 1.14)"
