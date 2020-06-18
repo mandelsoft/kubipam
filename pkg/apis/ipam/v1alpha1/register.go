@@ -31,7 +31,7 @@ const (
 )
 
 var IPAMRANGE = resources.NewGroupKind(GroupName, "IPAMRange")
-var IPAMREQUEST= resources.NewGroupKind(GroupName, "IPAMRequest")
+var IPAMREQUEST = resources.NewGroupKind(GroupName, "IPAMRequest")
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: Version}

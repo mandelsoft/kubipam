@@ -30,7 +30,6 @@ import (
 	"github.com/mandelsoft/kubipam/pkg/apis/ipam/v1alpha1"
 )
 
-
 func init() {
 	crds.AddToRegistry(apiextensions.DefaultRegistry())
 }

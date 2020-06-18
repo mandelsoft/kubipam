@@ -26,7 +26,6 @@ import (
 	"github.com/gardener/controller-manager-library/pkg/resources"
 )
 
-
 type Reconciler struct {
 	reconcile.DefaultReconciler
 	controller controller.Interface
@@ -44,7 +43,6 @@ func (this *Reconciler) Config() config.OptionSource {
 func (this *Reconciler) Controller() controller.Interface {
 	return this.controller
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 

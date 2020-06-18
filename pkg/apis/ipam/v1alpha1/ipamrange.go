@@ -53,6 +53,9 @@ type IPAMRange struct {
 type IPAMRangeSpec struct {
 	CIDR      string   `json:"cidr"`
 	ChunkSize []string `json:"chunkSize"`
+
+	// +optional
+	Ranges []string `json:"ranges"`
 }
 
 type IPAMRangeStatus struct {

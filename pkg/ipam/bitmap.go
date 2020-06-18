@@ -20,37 +20,38 @@ package ipam
 
 type Bitmap uint64
 
-const MAX_NET = 6
-const MAX_BITS = 1 << MAX_NET
+const MAX_BITMAP_NET = 6
+const MAX_BITMAP_SIZE = 1 << MAX_BITMAP_NET
+const MAX_BITMAP_HOST_MASK = (1 << MAX_BITMAP_NET) - 1
 
-var covermask = [MAX_NET + 1]Bitmap{}
+var hostmask = [MAX_BITMAP_NET + 1]Bitmap{}
 
 func init() {
 	m := Bitmap(1)
-	for i := 0; i <= MAX_NET; i++ {
+	for i := 0; i <= MAX_BITMAP_NET; i++ {
 		// m:=Bitmap(1<<(1<<i))-1
-		covermask[i] = m
+		hostmask[i] = m
 		m = (m+1)*(m+1) - 1
 	}
 }
 
-func coverMask(reqsize int) Bitmap {
-	return covermask[coverBits(reqsize)]
+func bitmapHostMask(reqsize int) Bitmap {
+	return hostmask[bitmapHostBits(reqsize)]
 }
 
-func coverBits(reqsize int) int {
-	return MAX_NET - reqsize
+func bitmapHostBits(reqsize int) int {
+	return MAX_BITMAP_NET - reqsize
 }
 
-func size(reqsize int) int {
-	return 1 << coverBits(reqsize)
+func bitmapHostSize(reqsize int) int {
+	return 1 << bitmapHostBits(reqsize)
 }
 
 func (this Bitmap) canAllocate(reqsize int) int {
-	s := size(reqsize)
-	m := coverMask(reqsize)
+	s := bitmapHostSize(reqsize)
+	m := bitmapHostMask(reqsize)
 
-	for c := 0; c <= MAX_BITS/s; c++ {
+	for c := 0; c <= MAX_BITMAP_SIZE/s; c++ {
 		masked := this & m
 		if masked == 0 {
 			return c * s
@@ -63,23 +64,23 @@ func (this Bitmap) canAllocate(reqsize int) int {
 func (this *Bitmap) allocate(reqsize int) int {
 	i := (*this).canAllocate(reqsize)
 	if i >= 0 {
-		(*this) |= coverMask(reqsize) << i
+		(*this) |= bitmapHostMask(reqsize) << i
 	}
 	return i
 }
 
 func (this Bitmap) isAllocated(addr, reqsize int) bool {
-	m := coverMask(reqsize) << addr
+	m := bitmapHostMask(reqsize) << addr
 	return this&m == m
 }
 
 func (this Bitmap) isFree(addr, reqsize int) bool {
-	m := coverMask(reqsize) << addr
+	m := bitmapHostMask(reqsize) << addr
 	return this&m == 0
 }
 
 func (this *Bitmap) busy(addr, reqsize int) bool {
-	m := coverMask(reqsize) << addr
+	m := bitmapHostMask(reqsize) << addr
 	if (*this)&m != 0 {
 		return false
 	}
@@ -88,7 +89,7 @@ func (this *Bitmap) busy(addr, reqsize int) bool {
 }
 
 func (this *Bitmap) free(addr, reqsize int) bool {
-	m := coverMask(reqsize) << addr
+	m := bitmapHostMask(reqsize) << addr
 
 	if (*this)&m != m {
 		return false

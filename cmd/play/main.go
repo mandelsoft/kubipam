@@ -26,15 +26,15 @@ import (
 )
 
 func main() {
-	_, cidr, _:=net.ParseCIDR("100.64.0.0/16")
-	ipam:=ipam.NewIPAM(cidr)
+	_, cidr, _ := net.ParseCIDR("100.64.0.0/16")
+	ipam := ipam.NewIPAM(cidr)
 
 	fmt.Printf("initial: %s\n", ipam)
 
-	a1:=ipam.Alloc(23)
-	a2:=ipam.Alloc(24)
-	a3:=ipam.Alloc(23)
-	a4:=ipam.Alloc(24)
+	a1 := ipam.Alloc(23)
+	a2 := ipam.Alloc(24)
+	a3 := ipam.Alloc(23)
+	a4 := ipam.Alloc(24)
 	fmt.Printf("alloc  : %s\n", ipam)
 
 	ipam.Free(a1)
