@@ -19,8 +19,15 @@
 package v1alpha1
 
 import (
+	"github.com/gardener/controller-manager-library/pkg/types"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const STATE_READY = "Ready"
+const STATE_INVALID = "Invalid"
+const STATE_BUSY = "Busy"
+const STATE_DELETING = "Deleting"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -34,11 +41,9 @@ type IPAMRangeList struct {
 
 // +kubebuilder:storageversion
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster,path=ipamranges,shortName=iprange,singular=ipamrange
+// +kubebuilder:resource:scope=Namespaced,path=ipamranges,shortName=iprange,singular=ipamrange
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name=CIDR,JSONPath=".spec.cidr",type=string
-// +kubebuilder:printcolumn:name=ChunkSize,JSONPath=".spec.chunkSize",type=integer
-// +kubebuilder:printcolumn:name=Busy,JSONPath=".status.busy",type=integer
+// +kubebuilder:printcolumn:name=STATE,JSONPath=".status.state",type=string
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -51,14 +56,11 @@ type IPAMRange struct {
 }
 
 type IPAMRangeSpec struct {
-	CIDR      string   `json:"cidr"`
-	ChunkSize []string `json:"chunkSize"`
-
-	// +optional
 	Ranges []string `json:"ranges"`
-}
 
-type IPAMRangeStatus struct {
 	// +optional
-	Busy string `json:"busy,omitempty"`
+	ChunkSize int `json:"chunkSize, omitempty"`
+}
+type IPAMRangeStatus struct {
+	types.StandardObjectStatus `json:",inline"`
 }

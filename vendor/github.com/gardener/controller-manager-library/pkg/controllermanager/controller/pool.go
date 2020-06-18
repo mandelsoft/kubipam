@@ -81,8 +81,10 @@ func (this *reconcilerMapping) getReconcilers(key interface{}) reconcilers {
 	return i
 }
 
-func (this *reconcilerMapping) addReconciler(key interface{}, reconciler reconcile.Interface) {
+func (this *reconcilerMapping) addReconciler(key ReconcilationElementSpec, reconciler reconcile.Interface) {
 	switch k := key.(type) {
+	case utils.StringMatcher:
+		this.values[string(k)] = this.values[string(k)].add(reconciler)
 	case utils.Matcher:
 		this.matchers[k] = this.matchers[k].add(reconciler)
 	default:
@@ -114,7 +116,9 @@ func NewPool(controller *controller, name string, size int, period time.Duration
 		reconcilers: newReconcilerMapping(),
 	}
 	pool.ctx, pool.LogContext = logger.WithLogger(
-		ctxutil.WaitGroupContext(context.WithValue(controller.GetContext(), poolkey, pool)),
+		ctxutil.WaitGroupContext(
+			context.WithValue(controller.GetContext(), poolkey, pool),
+			fmt.Sprintf("pool %s of controller %s", name, controller.GetName())),
 		"pool", name)
 	if pool.period != 0 {
 		pool.Infof("pool size %d, resync period %s", pool.size, pool.period.String())
@@ -128,7 +132,7 @@ func (p *pool) whenReady() {
 	p.controller.whenReady()
 }
 
-func (p *pool) addReconciler(key interface{}, reconciler reconcile.Interface) {
+func (p *pool) addReconciler(key ReconcilationElementSpec, reconciler reconcile.Interface) {
 	p.Infof("adding reconciler %T for key %q", reconciler, key)
 	p.reconcilers.addReconciler(key, reconciler)
 }

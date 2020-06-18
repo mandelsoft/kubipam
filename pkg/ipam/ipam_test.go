@@ -210,7 +210,7 @@ var _ = Describe("IPAM", func() {
 		})
 	})
 
-	Context("range", func() {
+	Context("sub range", func() {
 		_, cidr, _ := net.ParseCIDR("10.0.0.0/24")
 
 		It("initializes ipam correctly", func() {
@@ -225,4 +225,40 @@ var _ = Describe("IPAM", func() {
 			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000011 11111111], 10.0.0.64/26[10000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000]"))
 		})
 	})
+
+	Context("ranges", func() {
+		It("initializes ipam correctly", func() {
+			ipam, err := NewIPAMForRanges(MustParseIPRanges("10.0.8.0-10.0.247.0"))
+
+			Expect(err).To(BeNil())
+			Expect(ipam.String()).To(Equal("10.0.8.0/21[free], 10.0.16.0/20[free], 10.0.32.0/19[free], 10.0.64.0/18[free], 10.0.128.0/18[free], 10.0.192.0/19[free], 10.0.224.0/20[free], 10.0.240.0/22[free], 10.0.244.0/23[free], 10.0.246.0/24[free], 10.0.247.0/26[11111111 11111111 11111111 11111111 11111111 11111111 11111111 11111110]"))
+
+		})
+
+		It("initializes ipam correctly 2", func() {
+			ipam, err := NewIPAMForRanges(MustParseIPRanges("10.0.0.0/25", "10.0.0.128/25"))
+
+			Expect(err).To(BeNil())
+			Expect(ipam.String()).To(Equal("10.0.0.0/24[free]"))
+		})
+
+		It("initializes ipam correctly 3", func() {
+			ipam, err := NewIPAMForRanges(MustParseIPRanges("10.0.0.0/25", "10.0.0.128/28", "10.0.0.160/28"))
+
+			Expect(err).To(BeNil())
+			Expect(ipam.String()).To(Equal("10.0.0.0/25[free], 10.0.0.128/26[11111111 11111111 00000000 00000000 11111111 11111111 00000000 00000000]"))
+		})
+
+		It("allocates /30", func() {
+			ipam, err := NewIPAMForRanges(MustParseIPRanges("10.0.0.0/25", "10.0.0.128/28", "10.0.0.160/28"))
+
+			Expect(err).To(BeNil())
+			r1 := ipam.Alloc(30)
+			Expect(r1.String()).To(Equal("10.0.0.128/30"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/25[free], 10.0.0.128/26[11111111 11111111 00000000 00000000 11111111 11111111 00000000 00001111]"))
+			ipam.Free(r1)
+			Expect(ipam.String()).To(Equal("10.0.0.0/25[free], 10.0.0.128/26[11111111 11111111 00000000 00000000 11111111 11111111 00000000 00000000]"))
+		})
+	})
+
 })

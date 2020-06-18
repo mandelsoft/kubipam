@@ -1,0 +1,147 @@
+#
+# service account
+#
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: kubipam
+  name: kubipam
+  namespace: kube-system
+---
+#
+# permissions
+#
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  labels:
+    app: kubipam
+  name: kubipam
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+
+- apiGroups:
+    - ""
+  resources:
+    - nodes
+  verbs:
+    - list
+    - get
+
+- apiGroups:
+    - apps
+  resources:
+    - deployments
+  verbs:
+    - get
+    - update
+
+- apiGroups:
+  - ""
+  resources:
+    - serviceaccounts
+  verbs:
+    - get
+
+- apiGroups:
+  - ""
+  resources:
+    - configmaps
+  verbs:
+    - create
+    - get
+    - update
+
+- apiGroups:
+  - ipam.mandelsoft.org
+  resources:
+  - ipamranges
+  - ipamranges/status
+  - ipamrequests
+  - ipamrequests/status
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - get
+  - list
+  - update
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  labels:
+    app: kubipam
+  name: kubipam
+  namespace: kube-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  resourceNames:
+  # lease for controller manager
+  - kubipam
+  verbs:
+  - get
+  - update
+  - create
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: kubipam
+  name: kubipam
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubipam
+subjects:
+- kind: ServiceAccount
+  name: kubipam
+  namespace: kube-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  labels:
+    app: kubipam
+  name: kubipam
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubipam
+subjects:
+- kind: ServiceAccount
+  name: kubipam
+  namespace: kube-system

@@ -1,0 +1,9 @@
+apiVersion: ipam.mandelsoft.org/v1alpha1
+kind: IPAMRequest
+metadata:
+  name: mynet
+  namespace: default
+spec:
+# size: 32
+  ipam:
+    name: myrange

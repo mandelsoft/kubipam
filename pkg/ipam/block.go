@@ -65,7 +65,7 @@ func (this *Block) isBusy() bool {
 }
 
 func (this *Block) isCompletelyBusy() bool {
-	return this.busy == ^Bitmap(0)
+	return this.busy == BITMAP_BUSY
 }
 
 func (this *Block) matchState(b *Block) bool {
@@ -90,7 +90,7 @@ func (this *Block) set(cidr *net.IPNet, busy bool) bool {
 		return false
 	}
 	if busy {
-		this.busy = Bitmap(^uint(0))
+		this.busy = BITMAP_BUSY
 	} else {
 		this.busy = 0
 	}
@@ -117,7 +117,7 @@ func (this *Block) alloc(reqsize int) *net.IPNet {
 		return nil
 	}
 	cidr := this.cidr
-	this.busy = Bitmap(^uint(0))
+	this.busy = BITMAP_BUSY
 	return cidr
 }
 

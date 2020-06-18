@@ -53,8 +53,15 @@ type EventRecorder interface {
 	// AnnotatedEventf(object runtime.ObjectData, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{})
 }
 
+type ReconcilationElementSpec interface {
+	String() string
+}
+
+var _ ReconcilationElementSpec = schema.GroupKind{}
+var _ ReconcilationElementSpec = utils.Matcher(nil)
+
 type _ReconcilationKey struct {
-	key        interface{}
+	key        ReconcilationElementSpec
 	cluster    string
 	reconciler string
 }
@@ -108,6 +115,7 @@ type controller struct {
 	clusters        cluster.Clusters
 	filters         []ResourceFilter
 	owning          WatchResource
+	watches         map[string][]Watch
 	reconcilers     map[string]reconcile.Interface
 	reconcilerNames map[reconcile.Interface]string
 	mappings        _Reconcilations
@@ -136,6 +144,7 @@ func NewController(env Environment, def Definition, cmp mappings.Definition) (*c
 		filters: def.ResourceFilters(),
 
 		handlers:        map[string]*ClusterHandler{},
+		watches:         map[string][]Watch{},
 		pools:           map[string]*pool{},
 		reconcilers:     map[string]reconcile.Interface{},
 		reconcilerNames: map[reconcile.Interface]string{},
@@ -145,7 +154,7 @@ func NewController(env Environment, def Definition, cmp mappings.Definition) (*c
 
 	this.syncRequests = NewSyncRequests(this)
 
-	ctx := ctxutil.WaitGroupContext(env.GetContext())
+	ctx := ctxutil.WaitGroupContext(env.GetContext(), "controller ", def.Name())
 	this.ElementBase = extension.NewElementBase(ctx, ctx_controller, this, def.Name(), options)
 	this.sharedAttributes.LogContext = this.ElementBase
 	this.ready.start()
@@ -169,27 +178,11 @@ func NewController(env Environment, def Definition, cmp mappings.Definition) (*c
 	this.cluster = clusters.GetCluster(required[0])
 	this.EventRecorder = this.cluster.Resources()
 
-	for n, crds := range def.CustomResourceDefinitions() {
-		cluster := clusters.GetCluster(n)
-		if cluster == nil {
-			return nil, fmt.Errorf("cluster %q not found for resource definitions", n)
-		}
-		if isDeployCRDsDisabled(cluster) {
-			this.Infof("deployment of required crds is disabled for cluster %q (used for %q)", cluster.GetName(), n)
-			continue
-		}
-		this.Infof("ensure required crds for cluster %q (used for %q)", cluster.GetName(), n)
-		log := this.AddIndent("  ")
-		for _, v := range crds {
-			crd := v.GetFor(cluster.GetServerVersion())
-			if crd != nil {
-				err = apiextensions.CreateCRDFromObject(log, cluster, crd.DataFor(cluster, nil), env.ControllerManager().GetMaintainer())
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
+	err = this.deployCRDS()
+	if err != nil {
+		return nil, err
 	}
+
 	for n, t := range def.Reconcilers() {
 		this.Infof("creating reconciler %q", n)
 		reconciler, err := t(this)
@@ -202,21 +195,24 @@ func NewController(env Environment, def Definition, cmp mappings.Definition) (*c
 
 	for cname, watches := range this.definition.Watches() {
 		for _, w := range watches {
-			err := this.addReconciler(cname, w.ResourceType().GroupKind(), w.PoolName(), w.Reconciler())
+			ok, err := this.addReconciler(cname, w.ResourceType().GroupKind(), w.PoolName(), w.Reconciler())
 			if err != nil {
 				this.Errorf("GOT error: %s", err)
 				return nil, err
 			}
+			if ok {
+				this.watches[cname] = append(this.watches[cname], w)
+			}
 		}
 	}
-	err = this.addReconciler(required[0], this.Owning().GroupKind(), DEFAULT_POOL, DEFAULT_RECONCILER)
+	_, err = this.addReconciler(required[0], this.Owning().GroupKind(), DEFAULT_POOL, DEFAULT_RECONCILER)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, cmds := range this.GetDefinition().Commands() {
 		for _, cmd := range cmds {
-			err := this.addReconciler("", cmd.Key(), cmd.PoolName(), cmd.Reconciler())
+			_, err := this.addReconciler("", cmd.Key(), cmd.PoolName(), cmd.Reconciler())
 			if err != nil {
 				return nil, fmt.Errorf("Add matcher for reconciler %s failed: %s", cmd.Reconciler(), err)
 			}
@@ -235,6 +231,90 @@ func NewController(env Environment, def Definition, cmp mappings.Definition) (*c
 	return this, nil
 }
 
+func (this *controller) deployImplicitCustomResourceDefinitions(log logger.LogContext, eff WatchedResources, gks resources.GroupKindSet, cluster cluster.Interface) error {
+	for gk := range gks {
+		if eff.Contains(cluster.GetId(), gk) {
+			eff.Remove(cluster.GetId(), gk)
+			v, err := apiextensions.NewDefaultedCustomResourceDefinitionVersions(gk)
+			if err == nil {
+				err := v.Deploy(log, cluster, this.env.ControllerManager().GetMaintainer())
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			log.Infof("crd for %s already handled", gk)
+		}
+	}
+	return nil
+}
+
+func (this *controller) deployCRDS() error {
+	// first gather all intended or required resources
+	// by its effective and logical cluster usage
+	clusterResources := WatchedResources{}.Add(CLUSTER_MAIN, this.Owning().GroupKind())
+	effClusterResources := WatchedResources{}.Add(this.GetMainCluster().GetId(), this.Owning().GroupKind())
+	for cname, watches := range this.definition.Watches() {
+		cluster := this.GetCluster(cname)
+		if cluster == nil {
+			return fmt.Errorf("cluster %q not found for resource definitions", cname)
+		}
+		for _, w := range watches {
+			clusterResources.Add(cname, w.ResourceType().GroupKind())
+			effClusterResources.Add(cluster.GetId(), w.ResourceType().GroupKind())
+		}
+	}
+	for n, crds := range this.definition.CustomResourceDefinitions() {
+		cluster := this.GetCluster(n)
+		if cluster == nil {
+			return fmt.Errorf("cluster %q not found for resource definitions", n)
+		}
+		for _, v := range crds {
+			effClusterResources.Add(cluster.GetId(), v.GroupKind())
+		}
+	}
+
+	// now deploy explicit requested CRDs or implicitly available CRDs for used resources
+	log := this.AddIndent("  ")
+	for n, crds := range this.definition.CustomResourceDefinitions() {
+		cluster := this.GetCluster(n)
+		if isDeployCRDsDisabled(cluster) {
+			this.Infof("deployment of required crds is disabled for cluster %q (used for %q)", cluster.GetName(), n)
+			continue
+		}
+		this.Infof("ensure required crds for cluster %q (used for %q)", cluster.GetName(), n)
+		for _, v := range crds {
+			clusterResources.Remove(n, v.GroupKind())
+			if effClusterResources.Contains(cluster.GetId(), v.GroupKind()) {
+				effClusterResources.Remove(cluster.GetId(), v.GroupKind())
+				err := v.Deploy(log, cluster, this.env.ControllerManager().GetMaintainer())
+				if err != nil {
+					return err
+				}
+			} else {
+				log.Infof("crd for %s already handled", v.GroupKind())
+			}
+		}
+		err := this.deployImplicitCustomResourceDefinitions(log, effClusterResources, clusterResources[n], cluster)
+		if err != nil {
+			return err
+		}
+		delete(clusterResources, cluster.GetId())
+	}
+	for n, gks := range clusterResources {
+		cluster := this.GetCluster(n)
+		if isDeployCRDsDisabled(cluster) || len(gks) == 0 {
+			continue
+		}
+		this.Infof("ensure required crds for cluster %q (used for %q)", cluster.GetName(), n)
+		err := this.deployImplicitCustomResourceDefinitions(log, effClusterResources, gks, cluster)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func isDeployCRDsDisabled(cl cluster.Interface) bool {
 	return cl.GetAttr(cluster.SUBOPTION_DISABLE_DEPLOY_CRDS) == true
 }
@@ -251,38 +331,52 @@ func (this *controller) GetReconciler(name string) reconcile.Interface {
 	return this.reconcilers[name]
 }
 
-func (this *controller) addReconciler(cname string, key interface{}, pool string, reconciler string) error {
+func (this *controller) addReconciler(cname string, spec ReconcilationElementSpec, pool string, reconciler string) (bool, error) {
 	r := this.reconcilers[reconciler]
 	if r == nil {
-		return fmt.Errorf("reconciler %q not found for %q", reconciler, key)
+		return false, fmt.Errorf("reconciler %q not found for %q", reconciler, spec)
 	}
+
+	cluster := this.cluster
 	cluster_name := ""
 	aliases := utils.StringSet{}
 	if cname != "" {
-		cluster := this.clusters.GetCluster(cname)
+		cluster = this.clusters.GetCluster(cname)
 		if cluster == nil {
-			return fmt.Errorf("cluster %q not found for %q", mappings.ClusterName(cname), key)
+			return false, fmt.Errorf("cluster %q not found for %q", mappings.ClusterName(cname), spec)
 		}
 		cluster_name = cluster.GetName()
 		aliases = this.clusters.GetAliases(cluster.GetName())
 	}
-	src := _ReconcilationKey{key: key, cluster: cluster_name, reconciler: reconciler}
+	if gk, ok := spec.(schema.GroupKind); ok {
+		if reject, ok := r.(reconcile.ReconcilationRejection); ok {
+			if reject.RejectResourceReconcilation(cluster, gk) {
+				this.Infof("reconciler %s rejects resource reconcilation resource %s for cluster %s",
+					reconciler, gk, cluster.GetName())
+				return false, nil
+			}
+			this.Infof("reconciler %s supports reconcilation rejection and accepts resource %s for cluster %s",
+				reconciler, gk, cluster.GetName())
+		}
+	}
+
+	src := _ReconcilationKey{key: spec, cluster: cluster_name, reconciler: reconciler}
 	mapping, ok := this.mappings[src]
 	if ok {
 		if mapping != pool {
-			return fmt.Errorf("a key (%s) for the same cluster %q (used for %s) and reconciler (%s) can only be handled by one pool (found %q and %q)", key, cluster_name, aliases, reconciler, pool, mapping)
+			return false, fmt.Errorf("a key (%s) for the same cluster %q (used for %s) and reconciler (%s) can only be handled by one pool (found %q and %q)", spec, cluster_name, aliases, reconciler, pool, mapping)
 		}
 	} else {
 		this.mappings[src] = pool
 	}
 
 	if cname == "" {
-		this.Infof("*** adding reconciler %q for %q using pool %q", reconciler, key, pool)
+		this.Infof("*** adding reconciler %q for %q using pool %q", reconciler, spec, pool)
 	} else {
-		this.Infof("*** adding reconciler %q for %q in cluster %q (used for %q) using pool %q", reconciler, key, cluster_name, mappings.ClusterName(cname), pool)
+		this.Infof("*** adding reconciler %q for %q in cluster %q (used for %q) using pool %q", reconciler, spec, cluster_name, mappings.ClusterName(cname), pool)
 	}
-	this.getPool(pool).addReconciler(key, r)
-	return nil
+	this.getPool(pool).addReconciler(spec, r)
+	return true, nil
 }
 
 func (this *controller) getPool(name string) *pool {
@@ -349,7 +443,7 @@ func (this *controller) GetClusterById(id string) cluster.Interface {
 }
 
 func (this *controller) GetCluster(name string) cluster.Interface {
-	if name == CLUSTER_MAIN {
+	if name == CLUSTER_MAIN || name == "" {
 		return this.GetMainCluster()
 	}
 	return this.clusters.GetCluster(name)
@@ -481,20 +575,20 @@ func (this *controller) prepare() error {
 	}
 
 	this.Infof("setup watches....")
-	this.Infof("watching main resources %q at cluster %q", this.Owning(), h)
+	this.Infof("watching main resources %q at cluster %q (reconciler %s)", this.Owning(), h, DEFAULT_RECONCILER)
 
 	err = this.registerWatch(h, this.owning, DEFAULT_POOL)
 	if err != nil {
 		return err
 	}
-	for cname, watches := range this.GetDefinition().Watches() {
+	for cname, watches := range this.watches {
 		h, err := this.GetClusterHandler(cname)
 		if err != nil {
 			return err
 		}
 
 		for _, watch := range watches {
-			this.Infof("watching additional resources %q at cluster %q", watch.ResourceType(), h)
+			this.Infof("watching additional resources %q at cluster %q (reconciler %s)", watch.ResourceType(), h, watch.Reconciler())
 			this.registerWatch(h, watch, watch.PoolName())
 		}
 	}

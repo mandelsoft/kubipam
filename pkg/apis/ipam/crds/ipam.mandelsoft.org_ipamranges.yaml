@@ -16,18 +16,12 @@ spec:
     shortNames:
     - iprange
     singular: ipamrange
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.cidr
-      name: CIDR
+    - jsonPath: .status.state
+      name: STATE
       type: string
-    - jsonPath: .spec.chunkSize
-      name: ChunkSize
-      type: integer
-    - jsonPath: .status.busy
-      name: Busy
-      type: integer
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -47,18 +41,19 @@ spec:
           spec:
             properties:
               chunkSize:
+                type: integer
+              ranges:
                 items:
                   type: string
                 type: array
-              cidr:
-                type: string
             required:
-            - chunkSize
-            - cidr
+            - ranges
             type: object
           status:
             properties:
-              busy:
+              message:
+                type: string
+              state:
                 type: string
             type: object
         required:

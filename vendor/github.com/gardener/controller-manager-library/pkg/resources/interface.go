@@ -29,7 +29,7 @@ import (
 	"github.com/gardener/controller-manager-library/pkg/resources/abstract"
 )
 
-type KeyFilter func(key ClusterObjectKey) bool
+type KeyFilter = abstract.KeyFilter
 type ObjectFilter func(obj Object) bool
 type GroupKindProvider = abstract.GroupKindProvider
 type ClusterGroupKind = abstract.ClusterGroupKind
@@ -147,6 +147,7 @@ type Interface interface {
 	Update(ObjectData) (Object, error)
 	Modify(obj ObjectData, modifier Modifier) (ObjectData, bool, error)
 	ModifyByName(obj ObjectDataName, modifier Modifier) (Object, bool, error)
+	CreateOrModifyByName(obj ObjectDataName, modifier Modifier) (Object, bool, error)
 	ModifyStatus(obj ObjectData, modifier Modifier) (ObjectData, bool, error)
 	ModifyStatusByName(obj ObjectDataName, modifier Modifier) (Object, bool, error)
 	Delete(ObjectData) error
@@ -192,5 +193,8 @@ type Resources interface {
 	CreateObject(ObjectData) (Object, error)
 	CreateOrUpdateObject(obj ObjectData) (Object, error)
 
+	UpdateObject(obj ObjectData) (Object, error)
+	ModifyObject(obj ObjectData, modifier func(data ObjectData) (bool, error)) (ObjectData, bool, error)
+	ModifyObjectStatus(obj ObjectData, modifier func(data ObjectData) (bool, error)) (ObjectData, bool, error)
 	DeleteObject(obj ObjectData) error
 }

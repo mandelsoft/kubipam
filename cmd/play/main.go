@@ -27,7 +27,7 @@ import (
 
 func main() {
 	_, cidr, _ := net.ParseCIDR("100.64.0.0/16")
-	ipam := ipam.NewIPAM(cidr)
+	ipam, _ := ipam.NewIPAM(cidr)
 
 	fmt.Printf("initial: %s\n", ipam)
 

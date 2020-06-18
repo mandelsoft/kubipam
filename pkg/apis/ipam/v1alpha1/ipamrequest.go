@@ -17,11 +17,13 @@
 package v1alpha1
 
 import (
+	"github.com/gardener/controller-manager-library/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const STATE_ERROR = "Error"
-const STATE_INVALID = "Invalid"
+
+//const STATE_INVALID = "Invalid"
 const STATE_UP = "Up"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -36,10 +38,11 @@ type IPAMRequestList struct {
 
 // +kubebuilder:storageversion
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster,path=ipamrequests,shortName=ipreq,singular=ipamrequest
+// +kubebuilder:resource:scope=Namespaced,path=ipamrequests,shortName=ipreq,singular=ipamrequest
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name=IPAM,JSONPath=".spec.ipam.name",type=string
-// +kubebuilder:printcolumn:name=ChunlSize,JSONPath=".spec.chunkSize",type=integer
+// +kubebuilder:printcolumn:name=Size,JSONPath=".spec.size",type=integer
+// +kubebuilder:printcolumn:name=STATE,JSONPath=".status.state",type=string
 // +kubebuilder:printcolumn:name=CIDR,JSONPath=".status.cidr",type=string
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -53,20 +56,18 @@ type IPAMRequest struct {
 }
 
 type IPAMRequestSpec struct {
-	IPAM IPAMReference `json:"ipam"`
+	IPAM types.ObjectReference `json:"ipam"`
 	// +optional
-	ChunkSize int `json:"chunkSize,omitempty"`
-}
-
-type IPAMReference struct {
-	Name string `json:"name"`
+	Size int `json:"size,omitempty"`
 	// +optional
-	Namespace string `json:"namespace,omitempty"`
+	Description string `json:"description,omitempty"`
+	// +optional
+	Request string `json:"request,omitempty"` // not implemented yet - do not use
 }
 
 type IPAMRequestStatus struct {
-	// +optional
-	State string `json:"state,omitempty"`
+	types.StandardObjectStatus `json:",inline"`
+
 	// +optional
 	CIDR string `json:"cidr,omitempty"`
 }

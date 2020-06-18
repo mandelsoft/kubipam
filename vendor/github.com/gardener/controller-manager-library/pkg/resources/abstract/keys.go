@@ -31,10 +31,19 @@ import (
 // ObjectKey
 ////////////////////////////////////////////////////////////////////////////////
 
+func EqualsObjectKey(a, b ObjectKey) bool {
+	return EqualsObjectName(a.name, b.name) &&
+		a.groupKind == b.groupKind
+}
+
 var _ GroupKindProvider = ObjectKey{}
 
 func NewKey(groupKind schema.GroupKind, namespace, name string) ObjectKey {
 	return ObjectKey{groupKind, NewObjectName(namespace, name)}
+}
+
+func NewKeyForData(data ObjectData) ObjectKey {
+	return ObjectKey{data.GetObjectKind().GroupVersionKind().GroupKind(), NewObjectNameForData(data)}
 }
 
 func (this ObjectKey) GroupKind() schema.GroupKind {
@@ -79,6 +88,14 @@ func NewGroupKind(group, kind string) schema.GroupKind {
 ////////////////////////////////////////////////////////////////////////////////
 // ClusterObjectKey
 ////////////////////////////////////////////////////////////////////////////////
+
+type KeyFilter func(ClusterObjectKey) bool
+
+func EqualsClusterObjectKey(a, b ClusterObjectKey) bool {
+	return EqualsObjectName(a.name, b.name) &&
+		a.groupKind == b.groupKind &&
+		a.cluster == b.cluster
+}
 
 func NewClusterKeyForObject(cluster string, key ObjectKey) ClusterObjectKey {
 	return ClusterObjectKey{cluster, objectKey{key}}
@@ -245,6 +262,22 @@ func (this ClusterObjectKeySet) AsArray() []ClusterObjectKey {
 	return a
 }
 
+func (this ClusterObjectKeySet) Filter(filter KeyFilter) ClusterObjectKeySet {
+	if this == nil {
+		return nil
+	}
+	if filter == nil {
+		return this
+	}
+	set := NewClusterObjectKeySet()
+	for n := range this {
+		if filter(n) {
+			set[n] = struct{}{}
+		}
+	}
+	return set
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Group Kind Set
 ////////////////////////////////////////////////////////////////////////////////
@@ -284,6 +317,9 @@ func (this GroupKindSet) String() string {
 }
 
 func (this GroupKindSet) Contains(n schema.GroupKind) bool {
+	if this == nil {
+		return false
+	}
 	_, ok := this[n]
 	return ok
 }
@@ -494,6 +530,13 @@ func NewObjectNameFor(p ObjectNameProvider) GenericObjectName {
 	return NewObjectName(p.Namespace(), p.Name())
 }
 
+func NewObjectNameForData(p ObjectDataName) GenericObjectName {
+	if p == nil {
+		return nil
+	}
+	return NewObjectName(p.GetNamespace(), p.GetName())
+}
+
 func NewObjectName(names ...string) GenericObjectName {
 	switch len(names) {
 	case 1:
@@ -539,6 +582,10 @@ func ParseObjectName(name string) (GenericObjectName, error) {
 	default:
 		return nil, errors.NewInvalid("illegal object name %q", name)
 	}
+}
+
+func EqualsObjectName(a, b ObjectName) bool {
+	return a.Name() == b.Name() && a.Namespace() == b.Namespace()
 }
 
 ////////////////////////////////////////////////////////////////////////////////

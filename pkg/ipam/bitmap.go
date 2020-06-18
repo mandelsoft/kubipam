@@ -24,6 +24,8 @@ const MAX_BITMAP_NET = 6
 const MAX_BITMAP_SIZE = 1 << MAX_BITMAP_NET
 const MAX_BITMAP_HOST_MASK = (1 << MAX_BITMAP_NET) - 1
 
+const BITMAP_BUSY = ^Bitmap(0)
+
 var hostmask = [MAX_BITMAP_NET + 1]Bitmap{}
 
 func init() {

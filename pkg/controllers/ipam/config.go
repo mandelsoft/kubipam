@@ -19,53 +19,17 @@
 package controllers
 
 import (
-	"fmt"
-	"net"
-	"strings"
-
 	"github.com/gardener/controller-manager-library/pkg/config"
 )
 
 type Config struct {
-	nodecidr string
-
-	NodeCIDR *net.IPNet
-	IPIP     bool
 }
 
 var _ config.OptionSource = &Config{}
 
 func (this *Config) AddOptionsToSet(set config.OptionSet) {
-	set.AddStringOption(&this.nodecidr, "node-cidr", "", "", "CIDR of node network of cluster")
-	set.AddBoolOption(&this.IPIP, "ipip", "", false, "enforce local routing over ip-ip tunnel")
 }
 
 func (this *Config) Prepare() error {
-	var err error
-
-	_, this.NodeCIDR, err = this.RequireCIDR(this.nodecidr, "node-cidr")
-	if err != nil {
-		return err
-	}
 	return nil
-}
-
-func (this *Config) RequireCIDR(s, name string) (net.IP, *net.IPNet, error) {
-	ip, cidr, err := this.OptionalCIDR(s, name)
-	if cidr == nil && err == nil {
-		return nil, nil, fmt.Errorf("%s must be set", name)
-	}
-	return ip, cidr, nil
-}
-
-func (this *Config) OptionalCIDR(s, name string) (net.IP, *net.IPNet, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil, nil, nil
-	}
-	ip, cidr, err := net.ParseCIDR(s)
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid cidr (%s): %s", name, err)
-	}
-	return ip, cidr, nil
 }

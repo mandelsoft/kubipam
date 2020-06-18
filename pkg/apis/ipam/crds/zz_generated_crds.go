@@ -44,18 +44,12 @@ spec:
     shortNames:
     - iprange
     singular: ipamrange
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.cidr
-      name: CIDR
+    - jsonPath: .status.state
+      name: STATE
       type: string
-    - jsonPath: .spec.chunkSize
-      name: ChunkSize
-      type: integer
-    - jsonPath: .status.busy
-      name: Busy
-      type: integer
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -75,18 +69,19 @@ spec:
           spec:
             properties:
               chunkSize:
+                type: integer
+              ranges:
                 items:
                   type: string
                 type: array
-              cidr:
-                type: string
             required:
-            - chunkSize
-            - cidr
+            - ranges
             type: object
           status:
             properties:
-              busy:
+              message:
+                type: string
+              state:
                 type: string
             type: object
         required:
@@ -123,15 +118,18 @@ spec:
     shortNames:
     - ipreq
     singular: ipamrequest
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .spec.ipam.name
       name: IPAM
       type: string
-    - jsonPath: .spec.chunkSize
-      name: ChunlSize
+    - jsonPath: .spec.size
+      name: Size
       type: integer
+    - jsonPath: .status.state
+      name: STATE
+      type: string
     - jsonPath: .status.cidr
       name: CIDR
       type: string
@@ -153,9 +151,11 @@ spec:
             type: object
           spec:
             properties:
-              chunkSize:
-                type: integer
+              description:
+                type: string
               ipam:
+                description: ObjectReference is is plain reference to an object of
+                  an implicitly determined type
                 properties:
                   name:
                     type: string
@@ -164,12 +164,18 @@ spec:
                 required:
                 - name
                 type: object
+              request:
+                type: string
+              size:
+                type: integer
             required:
             - ipam
             type: object
           status:
             properties:
               cidr:
+                type: string
+              message:
                 type: string
               state:
                 type: string

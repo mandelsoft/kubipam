@@ -1,0 +1,44 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: kubipam
+    component: kubipam
+  name: kubipam
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubipam
+      component: kubipam
+  template:
+    metadata:
+      labels:
+        app: kubipam
+        component: kubipam
+    spec:
+      hostNetwork: true
+      containers:
+        - name: broker
+          image: mandelsoft/kubipam:latest
+          imagePullPolicy: "Always"
+          args:
+            - --server-port-http=8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            timeoutSeconds: 5
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          resources:
+            {}
+
+      serviceAccountName: kubipam
+      terminationGracePeriodSeconds: 120
+

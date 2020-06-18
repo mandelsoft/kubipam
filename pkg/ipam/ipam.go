@@ -69,6 +69,61 @@ func NewIPAM(cidr *net.IPNet, ranges ...*IPRange) (*IPAM, error) {
 	return ipam, nil
 }
 
+func NewIPAMForRanges(ranges IPRanges) (*IPAM, error) {
+	if len(ranges) == 0 {
+		return nil, fmt.Errorf("no ranges specified for IPAM")
+	}
+	ipam := &IPAM{}
+	cidrs, err := Includes(ranges...)
+	if err != nil {
+		return nil, err
+	}
+
+	ipv4 := true
+	for _, cidr := range cidrs {
+		if cidr.IP.To4() == nil {
+			ipv4 = false
+		}
+		break
+	}
+
+	last := ipam.block
+	for _, cidr := range cidrs {
+		var b *Block
+		if ipv4 {
+			cidr = CIDRto4(cidr)
+		} else {
+			cidr = CIDRto16(cidr)
+		}
+		if CIDRHostMaskSize(cidr) < MAX_BITMAP_NET {
+			n := cidr
+			for CIDRHostMaskSize(n) < MAX_BITMAP_NET {
+				n = CIDRExtend(n)
+			}
+			if last != nil && CIDREqual(n, last.cidr) {
+				last.set(cidr, false)
+				continue
+			}
+			b = &Block{cidr: n, busy: BITMAP_BUSY}
+			b.set(cidr, false)
+		} else {
+			b = &Block{cidr: cidr}
+		}
+		b.prev = last
+		if last != nil {
+			last.next = b
+		} else {
+			ipam.block = b
+		}
+		last = b
+	}
+	return ipam, nil
+}
+
+func (this *IPAM) Bits() int {
+	return CIDRBits(this.block.cidr)
+}
+
 func (this *IPAM) String() string {
 	s := ""
 	sep := ""

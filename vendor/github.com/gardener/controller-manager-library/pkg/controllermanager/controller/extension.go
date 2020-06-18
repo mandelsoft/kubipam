@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/gardener/controller-manager-library/pkg/config"
+	"github.com/gardener/controller-manager-library/pkg/resources"
 	"github.com/gardener/controller-manager-library/pkg/sync"
 
 	parentcfg "github.com/gardener/controller-manager-library/pkg/controllermanager/config"
@@ -130,7 +131,7 @@ type prepare interface {
 }
 
 func NewExtension(defs Definitions, cm extension.ControllerManager) (*Extension, error) {
-	ctx := ctxutil.WaitGroupContext(cm.GetContext())
+	ctx := ctxutil.WaitGroupContext(cm.GetContext(), "controller extension")
 	ext := extension.NewDefaultEnvironment(ctx, TYPE, cm)
 
 	cfg := areacfg.GetConfig(cm.GetConfig())
@@ -313,4 +314,18 @@ func (this *Extension) startController(cntr *controller) error {
 
 	ctxutil.WaitGroupRunAndCancelOnExit(this.GetContext(), cntr.Run)
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func (this *Extension) Enqueue(obj resources.Object) {
+	for _, c := range this.controllers {
+		c.Enqueue(obj)
+	}
+}
+
+func (this *Extension) EnqueueKey(key resources.ClusterObjectKey) {
+	for _, c := range this.controllers {
+		c.EnqueueKey(key)
+	}
 }

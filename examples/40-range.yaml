@@ -1,0 +1,9 @@
+apiVersion: ipam.mandelsoft.org/v1alpha1
+kind: IPAMRange
+metadata:
+  name: myrange
+  namespace: default
+spec:
+  chunkSize: 24
+  ranges:
+    - 192.168.0.0/16

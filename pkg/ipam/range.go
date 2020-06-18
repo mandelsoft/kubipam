@@ -81,10 +81,22 @@ func MustParseIPRange(str string) *IPRange {
 	return r
 }
 
-func MustParseIPRanges(str ...string) IPRanges {
+func ParseIPRanges(str ...string) (IPRanges, error) {
 	r := IPRanges{}
 	for _, s := range str {
-		r = append(r, MustParseIPRange(s))
+		e, err := ParseIPRange(s)
+		if err != nil {
+			return nil, err
+		}
+		r = append(r, e)
+	}
+	return r, nil
+}
+
+func MustParseIPRanges(str ...string) IPRanges {
+	r, err := ParseIPRanges(str...)
+	if err != nil {
+		panic(err)
 	}
 	return r
 }

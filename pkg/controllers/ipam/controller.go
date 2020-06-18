@@ -19,44 +19,48 @@
 package controllers
 
 import (
-	"time"
-
-	"github.com/gardener/controller-manager-library/pkg/config"
+	"github.com/gardener/controller-manager-library/pkg/controllermanager/controller/reconcile"
+	"github.com/gardener/controller-manager-library/pkg/controllermanager/controller/reconcile/reconcilers"
+	"github.com/gardener/controller-manager-library/pkg/resources"
 	"github.com/gardener/controller-manager-library/pkg/resources/apiextensions"
 
 	"github.com/gardener/controller-manager-library/pkg/controllermanager/controller"
 
 	"github.com/mandelsoft/kubipam/pkg/apis/ipam/crds"
-	"github.com/mandelsoft/kubipam/pkg/apis/ipam/v1alpha1"
+	api "github.com/mandelsoft/kubipam/pkg/apis/ipam/v1alpha1"
 )
+
+const NAME = "ipam"
 
 func init() {
 	crds.AddToRegistry(apiextensions.DefaultRegistry())
 }
 
-func BaseController(name string, config config.OptionSource) controller.Configuration {
-	return controller.Configure(name).
-		DefaultWorkerPool(1, 0).
-		OptionsByExample("options", config).
-		MainResourceByGK(v1alpha1.IPAMRANGE).
-		CustomResourceDefinitions(v1alpha1.IPAMRANGE).
-		CustomResourceDefinitions(v1alpha1.IPAMREQUEST).
-		WorkerPool("update", 1, 20*time.Second)
+func init() {
+	controller.Configure(NAME).
+		FinalizerDomain("mandelsoft.org").
+		DefaultWorkerPool(5, 0).
+		OptionsByExample("options", &Config{}).
+		Reconciler(Create).
+		MainResourceByGK(api.IPAMRANGE).
+		WatchesByGK(api.IPAMREQUEST).
+		With(reconcilers.UsageReconcilerForGKs("ipam", controller.CLUSTER_MAIN, api.IPAMRANGE)).
+		MustRegister()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-func CreateBaseReconciler(controller controller.Interface, impl ReconcilerImplementation) (*Reconciler, error) {
+func Create(controller controller.Interface) (reconcile.Interface, error) {
 	cfg, err := controller.GetOptionSource("options")
 	if err != nil {
 		return nil, err
 	}
-	config := impl.Config(cfg)
-
-	controller.Infof("using cidr for modes: %s", config.NodeCIDR)
+	config := cfg.(*Config)
 
 	return &Reconciler{
-		controller: controller,
-		config:     cfg,
+		ReconcilerSupport: reconcilers.NewReconcilerSupport(controller),
+		config:            config,
+		SimpleUsageCache:  reconcilers.GetSharedSimpleUsageCache(controller),
+		ipams:             map[resources.ObjectName]*IPAM{},
 	}, nil
 }
