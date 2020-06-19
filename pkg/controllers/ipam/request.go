@@ -21,6 +21,7 @@ package controllers
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/gardener/controller-manager-library/pkg/controllermanager/controller/reconcile"
@@ -31,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	api "github.com/mandelsoft/kubipam/pkg/apis/ipam/v1alpha1"
+	"github.com/mandelsoft/kubipam/pkg/ipam"
 )
 
 var assignedCIDRField = fieldpath.RequiredField(&api.IPAMRequest{}, ".Status.CIDR")
@@ -65,9 +67,11 @@ func (this *Reconciler) reconcileRequest(logger logger.LogContext, obj resources
 		return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_INVALID, "IPAMRange object not specified"))
 	}
 
-	if r.Spec.Request != "" {
-		return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_INVALID, "request field not implemented yet"))
-	}
+	/*
+		if r.Spec.Request != "" {
+			return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_INVALID, "request field not implemented yet"))
+		}
+	*/
 
 	this.UpdateFilteredUsesFor(obj.ClusterKey(), rangeFilter, resources.NewClusterObjectKeySet(this.NewClusterObjectKey(api.IPAMRANGE, ref)))
 	ipr := this.getRange(ref)
@@ -106,7 +110,34 @@ func (this *Reconciler) reconcileRequest(logger logger.LogContext, obj resources
 				return reconcile.Delay(logger, err)
 			}
 		}
-		cidr := ipr.ipam.Alloc(size)
+		var cidr *net.IPNet
+		if r.Spec.Request != "" {
+			var ip net.IP
+			var c *net.IPNet
+			ip, c, err = net.ParseCIDR(strings.TrimSpace(r.Spec.Request))
+			if err != nil {
+				ip = net.ParseIP(strings.TrimSpace(r.Spec.Request))
+				if ip == nil {
+					return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_INVALID,
+						fmt.Sprintf("invalid request cidr or ip %s: %s", r.Spec.Request, err)))
+				}
+				c = ipam.IPtoCIDR(ip)
+			}
+			if !ip.Equal(c.IP) {
+				cidr = ipam.IPtoCIDR(ip)
+			} else {
+				cidr = c
+			}
+			if !ipr.ipam.Busy(cidr) {
+				err = fmt.Errorf("%s already busy", cidr)
+				cidr = nil
+			}
+		} else {
+			cidr = ipr.ipam.Alloc(size)
+			if cidr == nil {
+				err = fmt.Errorf("allocation with size %d failed", size)
+			}
+		}
 		if cidr != nil {
 			logger.Infof("allocated %s", cidr)
 			_, err := resources.ModifyStatus(obj, func(mod *resources.ModificationState) error {
@@ -115,15 +146,15 @@ func (this *Reconciler) reconcileRequest(logger logger.LogContext, obj resources
 			})
 			if err != nil {
 				ipr.ipam.Free(cidr)
-				ipr.object.Event(corev1.EventTypeWarning, "allocation", fmt.Sprintf("allocation update failed: %s", err))
+				ipr.object.Eventf(corev1.EventTypeWarning, "allocation", "allocation update failed: %s", err)
 				return reconcile.Delay(logger, err)
 			}
 		} else {
 			this.EnqueueKeys(this.GetUsesFor(this.NewClusterObjectKey(api.IPAMRANGE, ref)))
-			ipr.object.Event(corev1.EventTypeWarning, "allocation", fmt.Sprintf("allocation size %d failed", size))
-			return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_BUSY, fmt.Sprintf("requested chunk not available: %d", size)), 2*time.Minute)
+			ipr.object.Event(corev1.EventTypeWarning, "allocation", err.Error())
+			return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_BUSY, err.Error()), 2*time.Minute)
 		}
-		ipr.object.Event(corev1.EventTypeNormal, "allocation", fmt.Sprintf("cidr %s allocated", cidr))
+		ipr.object.Eventf(corev1.EventTypeNormal, "allocation", "cidr %s allocated", cidr)
 	}
 	return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_READY, ""))
 }

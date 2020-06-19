@@ -62,6 +62,11 @@ A request may specify a dedicated size (for example 32 for a dedicated IPv4
 Address). If no size is given (either by the referenced pool or by the request
 itself) a single IP address is allocated (/32 or /128).
 
+By specifying a request CIDR or IP in the field `request` in the request object
+it is possible to request the allocation of a dedicated range or IP.
+If it could be granted the status is set accordinly as for an anonymous
+request.
+
 The allocation is released again, when the request object is deleted.
 
 

@@ -70,6 +70,17 @@ func CIDREqual(a, b *net.IPNet) bool {
 	return true
 }
 
+func CIDRAlign(cidr *net.IPNet, bits int) *net.IPNet {
+	if bits != CIDRBits(cidr) {
+		if bits == net.IPv4len*8 {
+			cidr = CIDRto4(cidr)
+		} else {
+			cidr = CIDRto16(cidr)
+		}
+	}
+	return cidr
+}
+
 func CIDRto4(cidr *net.IPNet) *net.IPNet {
 	if len(cidr.Mask) == net.IPv4len {
 		return cidr

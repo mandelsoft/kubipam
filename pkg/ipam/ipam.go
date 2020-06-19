@@ -178,10 +178,18 @@ func (this *IPAM) join(b *Block) {
 }
 
 func (this *IPAM) Busy(cidr *net.IPNet) bool {
+	cidr=CIDRAlign(cidr, this.Bits())
+	if cidr == nil {
+		return false
+	}
 	return this.set(cidr, true)
 }
 
 func (this *IPAM) Free(cidr *net.IPNet) bool {
+	cidr=CIDRAlign(cidr, this.Bits())
+	if cidr == nil {
+		return false
+	}
 	return this.set(cidr, false)
 }
 
@@ -213,7 +221,9 @@ func (this *IPAM) set(cidr *net.IPNet, busy bool) bool {
 		return false
 	}
 
-	b.set(cidr, busy)
+	if !b.set(cidr, busy) {
+		return false
+	}
 	this.join(b)
 	return true
 }

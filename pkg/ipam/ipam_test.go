@@ -60,6 +60,21 @@ var _ = Describe("IPAM", func() {
 			Expect(ipam.block.prev).To(BeNil())
 		})
 
+		It("busy", func() {
+			ipam, _ := NewIPAM(cidr)
+
+			r1 := MustParseCIDR("10.128.0.0/10")
+			Expect(ipam.Busy(r1)).To(BeTrue())
+			Expect(ipam.String()).To(Equal("10.0.0.0/9[free], 10.128.0.0/10[busy], 10.192.0.0/10[free]"))
+
+			r2 := MustParseCIDR("10.128.1.0/24")
+			Expect(ipam.Busy(r2)).To(BeFalse())
+			Expect(ipam.String()).To(Equal("10.0.0.0/9[free], 10.128.0.0/10[busy], 10.192.0.0/10[free]"))
+
+			ipam.Free(r1)
+			Expect(ipam.String()).To(Equal("10.0.0.0/8[free]"))
+		})
+
 		It("scenario", func() {
 			ipam, _ := NewIPAM(cidr)
 
@@ -126,6 +141,25 @@ var _ = Describe("IPAM", func() {
 			Expect(r1.String()).To(Equal("10.0.0.0/28"))
 
 			Expect(ipam.Free(r1)).To(BeTrue())
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[free]"))
+		})
+
+		It("busy", func() {
+			ipam, _ := NewIPAM(cidr)
+
+			r1 := MustParseCIDR("10.0.0.8/29")
+			Expect(ipam.Busy(r1)).To(BeTrue())
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 11111111 00000000]"))
+
+			r2 := MustParseCIDR("10.0.0.12/30")
+			Expect(ipam.Busy(r2)).To(BeFalse())
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 11111111 00000000]"))
+
+			r3 := MustParseCIDR("10.0.0.0/27")
+			Expect(ipam.Busy(r3)).To(BeFalse())
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 11111111 00000000]"))
+
+			ipam.Free(r1)
 			Expect(ipam.String()).To(Equal("10.0.0.0/26[free]"))
 		})
 
