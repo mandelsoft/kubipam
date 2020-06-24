@@ -32,14 +32,22 @@ type Block struct {
 	next *Block
 }
 
-func (this *Block) canAlloc(reqsize int) bool {
+func (this *Block) canAlloc(next net.IP, reqsize int) bool {
 	s, l := this.cidr.Mask.Size()
 	if s > reqsize {
 		return false
 	}
+	if next != nil && IPDiff(CIDRLastIP(this.cidr), next) < 0 {
+		return false
+	}
 
 	if l-s <= MAX_BITMAP_NET {
-		return this.busy.canAllocate(reqsize-l+MAX_BITMAP_NET) >= 0
+		n := reqsize - l + MAX_BITMAP_NET
+		start := 0
+		if next != nil {
+			start = int(IPDiff(next, this.cidr.IP))
+		}
+		return this.busy.canAllocate2(start, n) >= 0
 	}
 	return this.busy == 0
 }
@@ -97,14 +105,19 @@ func (this *Block) set(cidr *net.IPNet, busy bool) bool {
 	return true
 }
 
-func (this *Block) alloc(reqsize int) *net.IPNet {
+func (this *Block) alloc(next net.IP, reqsize int) *net.IPNet {
 	s, l := this.cidr.Mask.Size()
 	if s > reqsize {
 		return nil
 	}
 
 	if l-s <= MAX_BITMAP_NET {
-		ip := this.busy.allocate(reqsize - l + MAX_BITMAP_NET)
+		n := reqsize - l + MAX_BITMAP_NET
+		start := 0
+		if next != nil {
+			start = int(IPDiff(next, this.cidr.IP))
+		}
+		ip := this.busy.allocate2(start, n)
 
 		c := &net.IPNet{
 			IP:   CIDRSubIP(this.cidr, int64(ip)),

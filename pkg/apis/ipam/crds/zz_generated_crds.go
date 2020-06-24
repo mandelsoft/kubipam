@@ -47,6 +47,9 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.mode
+      name: Mode
+      type: string
     - jsonPath: .status.state
       name: STATE
       type: string
@@ -70,6 +73,8 @@ spec:
             properties:
               chunkSize:
                 type: integer
+              mode:
+                type: string
               ranges:
                 items:
                   type: string
@@ -81,6 +86,10 @@ spec:
             properties:
               message:
                 type: string
+              roundRobin:
+                items:
+                  type: string
+                type: array
               state:
                 type: string
             type: object

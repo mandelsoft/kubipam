@@ -43,6 +43,11 @@ func CIDRHostMaskSize(cidr *net.IPNet) int {
 	return l - s
 }
 
+func CIDRHostSize(cidr *net.IPNet) int64 {
+	s, l := cidr.Mask.Size()
+	return 1 << (l - s)
+}
+
 func CIDRBits(cidr *net.IPNet) int {
 	return len(cidr.Mask) * 8
 }

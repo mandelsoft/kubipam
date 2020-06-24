@@ -21,6 +21,7 @@ package controllers
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"strings"
 	"time"
 
@@ -148,6 +149,26 @@ func (this *Reconciler) reconcileRequest(logger logger.LogContext, obj resources
 				ipr.ipam.Free(cidr)
 				ipr.object.Eventf(corev1.EventTypeWarning, "allocation", "allocation update failed: %s", err)
 				return reconcile.Delay(logger, err)
+			}
+			_, err = resources.ModifyStatus(ipr.object, func(mod *resources.ModificationState) error {
+				r := mod.Object().Data().(*api.IPAMRange)
+
+				cur := ipr.ipam.State()
+				state := []string{}
+				for i := 0; i < len(cur); i++ {
+					if cur[i] != nil {
+						state = append(state, fmt.Sprintf("%s/%d", cur[i], i))
+					}
+				}
+				if !reflect.DeepEqual(state, r.Status.RoundRobin) {
+					r.Status.RoundRobin = state
+					mod.Modify(true)
+				}
+				return nil
+			})
+			if err != nil {
+				ipr.object.Event(corev1.EventTypeWarning, "allocation", fmt.Sprintf("allocation state update failed: %s", err.Error()))
+				logger.Errorf(fmt.Sprintf("allocation state update failed: %s", err.Error()))
 			}
 		} else {
 			this.EnqueueKeys(this.GetUsesFor(this.NewClusterObjectKey(api.IPAMRANGE, ref)))

@@ -50,21 +50,31 @@ func bitmapHostSize(reqsize int) int {
 }
 
 func (this Bitmap) canAllocate(reqsize int) int {
-	s := bitmapHostSize(reqsize)
-	m := bitmapHostMask(reqsize)
+	return this.canAllocate2(0, reqsize)
+}
 
-	for c := 0; c <= MAX_BITMAP_SIZE/s; c++ {
-		masked := this & m
-		if masked == 0 {
-			return c * s
+func (this *Bitmap) allocate(reqsize int) int {
+	return this.allocate2(0, reqsize)
+}
+
+func (this Bitmap) canAllocate2(start, reqsize int) int {
+	if start < MAX_BITMAP_SIZE {
+		s := bitmapHostSize(reqsize)
+		m := bitmapHostMask(reqsize) << start
+
+		for c := start; c <= MAX_BITMAP_SIZE; c += s {
+			masked := this & m
+			if masked == 0 {
+				return c
+			}
+			m <<= s
 		}
-		m <<= s
 	}
 	return -1
 }
 
-func (this *Bitmap) allocate(reqsize int) int {
-	i := (*this).canAllocate(reqsize)
+func (this *Bitmap) allocate2(start, reqsize int) int {
+	i := (*this).canAllocate2(start, reqsize)
 	if i >= 0 {
 		(*this) |= bitmapHostMask(reqsize) << i
 	}

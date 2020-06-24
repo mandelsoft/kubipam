@@ -75,6 +75,46 @@ var _ = Describe("IPAM", func() {
 			Expect(ipam.String()).To(Equal("10.0.0.0/8[free]"))
 		})
 
+		It("no round robin", func() {
+			ipam, _ := NewIPAM(cidr)
+			ipam.SetRoundRobin(false)
+
+			r1 := ipam.Alloc(9)
+			Expect(r1.String()).To(Equal("10.0.0.0/9"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(9)
+			Expect(r1.String()).To(Equal("10.0.0.0/9"))
+			ipam.Free(r1)
+			Expect(ipam.String()).To(Equal("10.0.0.0/8[free]"))
+		})
+
+		It("no round robin", func() {
+			ipam, _ := NewIPAM(cidr)
+			ipam.SetRoundRobin(false)
+
+			r1 := ipam.Alloc(9)
+			Expect(r1.String()).To(Equal("10.0.0.0/9"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(9)
+			Expect(r1.String()).To(Equal("10.0.0.0/9"))
+			ipam.Free(r1)
+			Expect(ipam.String()).To(Equal("10.0.0.0/8[free]"))
+		})
+		It("round robin", func() {
+			ipam, _ := NewIPAM(cidr)
+			ipam.SetRoundRobin(true)
+
+			r1 := ipam.Alloc(9)
+			Expect(r1.String()).To(Equal("10.0.0.0/9"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(9)
+			Expect(r1.String()).To(Equal("10.128.0.0/9"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(9)
+			Expect(r1.String()).To(Equal("10.0.0.0/9"))
+			ipam.Free(r1)
+			Expect(ipam.String()).To(Equal("10.0.0.0/8[free]"))
+		})
 		It("scenario", func() {
 			ipam, _ := NewIPAM(cidr)
 
@@ -163,6 +203,35 @@ var _ = Describe("IPAM", func() {
 			Expect(ipam.String()).To(Equal("10.0.0.0/26[free]"))
 		})
 
+		It("no round robin", func() {
+			ipam, _ := NewIPAM(cidr)
+			ipam.SetRoundRobin(false)
+
+			r1 := ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.0/27"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.0/27"))
+			ipam.Free(r1)
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[free]"))
+		})
+
+		It("round robin", func() {
+			ipam, _ := NewIPAM(cidr)
+			ipam.SetRoundRobin(true)
+
+			r1 := ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.0/27"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.32/27"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.0/27"))
+			ipam.Free(r1)
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[free]"))
+		})
+
 		It("scenario", func() {
 			ipam, _ := NewIPAM(cidr)
 
@@ -205,6 +274,47 @@ var _ = Describe("IPAM", func() {
 			r2 := ipam.Alloc(25)
 			Expect(r2.String()).To(Equal("10.0.0.128/25"))
 			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000001], 10.0.0.64/26[free], 10.0.0.128/25[busy]"))
+		})
+
+		It("no round robin", func() {
+			_, cidr, _ := net.ParseCIDR("10.0.0.0/25")
+			ipam, _ := NewIPAM(cidr)
+			ipam.SetRoundRobin(false)
+
+			r1 := ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.0/27"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.0/27"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.0/27"))
+			ipam.Free(r1)
+			Expect(ipam.String()).To(Equal("10.0.0.0/25[free]"))
+
+		})
+
+		It("round robin", func() {
+			_, cidr, _ := net.ParseCIDR("10.0.0.0/25")
+			ipam, _ := NewIPAM(cidr)
+			ipam.SetRoundRobin(true)
+
+			r1 := ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.0/27"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.32/27"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.64/27"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.96/27"))
+			ipam.Free(r1)
+			r1 = ipam.Alloc(27)
+			Expect(r1.String()).To(Equal("10.0.0.0/27"))
+			ipam.Free(r1)
+			Expect(ipam.String()).To(Equal("10.0.0.0/25[free]"))
 		})
 
 		It("scenario", func() {

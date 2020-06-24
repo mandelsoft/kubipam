@@ -55,6 +55,12 @@ func (this *Reconciler) setupIPAM(logger logger.LogContext, obj resources.Object
 		o.error = err.Error()
 		return true, err
 	}
+	if r.Spec.Mode == api.MODE_ROUNDROBIN {
+		ipr.SetRoundRobin(true)
+		ipr.SetState(r.GetState())
+	} else {
+		ipr.SetRoundRobin(false)
+	}
 	o.ipam = ipr
 	return true, nil
 }
@@ -81,23 +87,37 @@ func (this *Reconciler) reconcileRange(logger logger.LogContext, obj resources.O
 	}
 	r := obj.Data().(*api.IPAMRange)
 	ranges, err := ipam.ParseIPRanges(r.Spec.Ranges...)
+
+	roundRobin := false
+	if err == nil {
+		switch r.Spec.Mode {
+		case "", api.MODE_FIRSTMATCH:
+			roundRobin = false
+		case api.MODE_ROUNDROBIN:
+			roundRobin = true
+		default:
+			err = fmt.Errorf("invalid mode %q: use %s or %s", r.Spec.Mode, api.MODE_FIRSTMATCH, api.MODE_ROUNDROBIN)
+		}
+	}
+
+	var ipr *ipam.IPAM
+	if err == nil {
+		ipr, err = ipam.NewIPAMForRanges(ranges)
+	}
+
+	if err == nil {
+		if ipr.Bits() < r.Spec.ChunkSize {
+			err = fmt.Errorf("chunk size %d too large: network %d", r.Spec.ChunkSize, ipr.Bits())
+		}
+	}
+
 	if err != nil {
 		if old != nil {
 			old.error = err.Error()
 		}
 		return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_INVALID, err.Error()))
 	}
-	ipr, err := ipam.NewIPAMForRanges(ranges)
-	if err != nil {
-		if old != nil {
-			old.error = err.Error()
-		}
-		return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_INVALID, err.Error()))
-	}
-	if ipr.Bits() < r.Spec.ChunkSize {
-		return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_INVALID,
-			fmt.Sprintf("chunk size %d too large: network %d", r.Spec.ChunkSize, ipr.Bits())))
-	}
+
 	if old == nil {
 		new := &IPAM{
 			object:    obj,
@@ -108,11 +128,13 @@ func (this *Reconciler) reconcileRange(logger logger.LogContext, obj resources.O
 		new.lock.Lock()
 		defer new.lock.Unlock()
 		this.setRange(obj.ObjectName(), new)
+		new.ipam.SetRoundRobin(roundRobin)
 	} else {
 		old.lock.Lock()
 		defer old.lock.Unlock()
 		old.object = obj
 		old.chunksize = r.Spec.ChunkSize
+		old.ipam.SetRoundRobin(roundRobin)
 	}
 	if len(this.GetUsersFor(obj.ClusterKey())) > 0 {
 		if !this.Controller().HasFinalizer(obj) {
@@ -121,6 +143,17 @@ func (this *Reconciler) reconcileRange(logger logger.LogContext, obj resources.O
 				return reconcile.Delay(logger, err)
 			}
 		}
+	}
+	if r.Spec.Mode == "" {
+		mode := api.MODE_FIRSTMATCH
+		if ipr.IsRoundRobin() {
+			mode = api.MODE_ROUNDROBIN
+		}
+		reconcile.Update(logger, resources.NewUpdater(obj, func(mod *resources.ModificationState) error {
+			r := mod.Data().(*api.IPAMRange)
+			mod.AssureStringValue(&r.Spec.Mode, mode)
+			return nil
+		}))
 	}
 	return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_READY, ""))
 }

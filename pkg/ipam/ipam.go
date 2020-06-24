@@ -24,21 +24,29 @@ import (
 )
 
 type IPAM struct {
-	block *Block
+	block      *Block
+	nextAlloc  []net.IP
+	roundRobin bool
 }
 
 func NewIPAM(cidr *net.IPNet, ranges ...*IPRange) (*IPAM, error) {
+	var nextAlloc []net.IP
 	copy := *cidr
 	if len(cidr.Mask) == net.IPv4len {
 		copy.IP = cidr.IP.To4()
+		nextAlloc = make([]net.IP, net.IPv4len*8+1)
 	} else {
 		copy.IP = cidr.IP.To16()
+		nextAlloc = make([]net.IP, net.IPv6len*8+1)
 	}
 	block := &Block{
 		cidr: &copy,
 	}
+
+	_ = nextAlloc
 	ipam := &IPAM{
-		block: block,
+		block:     block,
+		nextAlloc: nextAlloc,
 	}
 	if len(ranges) > 0 {
 		cidrs, err := Excludes(cidr, ranges...)
@@ -70,10 +78,10 @@ func NewIPAM(cidr *net.IPNet, ranges ...*IPRange) (*IPAM, error) {
 }
 
 func NewIPAMForRanges(ranges IPRanges) (*IPAM, error) {
+	var nextAlloc []net.IP
 	if len(ranges) == 0 {
 		return nil, fmt.Errorf("no ranges specified for IPAM")
 	}
-	ipam := &IPAM{}
 	cidrs, err := Includes(ranges...)
 	if err != nil {
 		return nil, err
@@ -85,6 +93,16 @@ func NewIPAMForRanges(ranges IPRanges) (*IPAM, error) {
 			ipv4 = false
 		}
 		break
+	}
+
+	if ipv4 {
+		nextAlloc = make([]net.IP, net.IPv4len*8+1)
+	} else {
+		nextAlloc = make([]net.IP, net.IPv6len*8+1)
+	}
+	_ = nextAlloc
+	ipam := &IPAM{
+		nextAlloc: nextAlloc,
 	}
 
 	last := ipam.block
@@ -120,8 +138,43 @@ func NewIPAMForRanges(ranges IPRanges) (*IPAM, error) {
 	return ipam, nil
 }
 
+func (this *IPAM) SetRoundRobin(b bool) {
+	if !b && this.roundRobin {
+		this.nextAlloc = make([]net.IP, len(this.nextAlloc), len(this.nextAlloc))
+	}
+	this.roundRobin = b
+}
+
+func (this *IPAM) State() []net.IP {
+	return this.nextAlloc
+}
+
+func (this *IPAM) IsRoundRobin() bool {
+	return this.roundRobin
+}
+
+func (this *IPAM) SetState(next []net.IP) error {
+	if len(next) > len(this.nextAlloc) {
+		return fmt.Errorf("invalid state")
+	}
+	ipv4 := this.Bits() == net.IPv4len*8
+	for i := 0; i < len(this.nextAlloc); i++ {
+		if i < len(next) && next[i] != nil {
+			if ipv4 {
+				this.nextAlloc[i] = next[i].To4()
+			} else {
+				this.nextAlloc[i] = next[i].To16()
+			}
+		} else {
+			this.nextAlloc[i] = nil
+		}
+	}
+	return nil
+}
+
 func (this *IPAM) Bits() int {
-	return CIDRBits(this.block.cidr)
+	return len(this.nextAlloc) - 1
+	// return CIDRBits(this.block.cidr)
 }
 
 func (this *IPAM) String() string {
@@ -136,37 +189,73 @@ func (this *IPAM) String() string {
 	return s
 }
 
+func (this *IPAM) getNext(reqsize int) net.IP {
+	if this.roundRobin {
+		return this.nextAlloc[reqsize]
+	}
+	return nil
+}
+
+func (this *IPAM) setNext(cidr *net.IPNet) {
+	if this.roundRobin {
+		this.nextAlloc[CIDRNetMaskSize(cidr)] = IPAdd(cidr.IP, CIDRHostSize(cidr))
+	}
+}
+
 func (this *IPAM) Alloc(reqsize int) *net.IPNet {
 	var found *Block
-	b := this.block
 
-	for b != nil {
-		s := b.Size()
-		if b.canAlloc(reqsize) {
-			if found == nil || s > found.Size() {
-				found = b
-				if found.matchSize(reqsize) {
-					break
+	if reqsize < 0 || reqsize > this.Bits() {
+		return nil
+	}
+	next := this.getNext(reqsize)
+
+	for found == nil {
+		for b := this.block; b != nil; b = b.next {
+			s := b.Size()
+			if next != nil {
+				if IPDiff(CIDRLastIP(b.cidr), next) < 0 {
+					continue
+				}
+			}
+
+			if b.canAlloc(next, reqsize) {
+				if found == nil || s > found.Size() {
+					found = b
+					if found.matchSize(reqsize) {
+						break
+					}
 				}
 			}
 		}
-		b = b.next
+		if next == nil || found != nil {
+			break
+		}
+		next = nil
+		this.nextAlloc[reqsize] = nil
 	}
 	if found == nil {
 		return nil
 	}
 	found = this.split(found, reqsize)
 
-	cidr := found.alloc(reqsize)
+	cidr := found.alloc(next, reqsize)
 	if cidr != nil {
+		this.setNext(cidr)
 		this.join(found)
 	}
 	return cidr
 }
 
 func (this *IPAM) split(b *Block, reqsize int) *Block {
+	next := this.nextAlloc[reqsize]
 	for b.Size() < reqsize && b.canSplit() {
 		b.split()
+		if next != nil {
+			if IPDiff(b.next.cidr.IP, next) <= 0 {
+				b = b.next
+			}
+		}
 	}
 	return b
 }
@@ -178,7 +267,7 @@ func (this *IPAM) join(b *Block) {
 }
 
 func (this *IPAM) Busy(cidr *net.IPNet) bool {
-	cidr=CIDRAlign(cidr, this.Bits())
+	cidr = CIDRAlign(cidr, this.Bits())
 	if cidr == nil {
 		return false
 	}
@@ -186,7 +275,7 @@ func (this *IPAM) Busy(cidr *net.IPNet) bool {
 }
 
 func (this *IPAM) Free(cidr *net.IPNet) bool {
-	cidr=CIDRAlign(cidr, this.Bits())
+	cidr = CIDRAlign(cidr, this.Bits())
 	if cidr == nil {
 		return false
 	}

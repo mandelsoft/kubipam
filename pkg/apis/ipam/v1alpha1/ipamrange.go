@@ -19,6 +19,8 @@
 package v1alpha1
 
 import (
+	"net"
+
 	"github.com/gardener/controller-manager-library/pkg/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +30,9 @@ const STATE_READY = "Ready"
 const STATE_INVALID = "Invalid"
 const STATE_BUSY = "Busy"
 const STATE_DELETING = "Deleting"
+
+const MODE_ROUNDROBIN = "RoundRobin"
+const MODE_FIRSTMATCH = "FirstMatch" // default
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -43,6 +48,7 @@ type IPAMRangeList struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Namespaced,path=ipamranges,shortName=iprange,singular=ipamrange
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name=Mode,JSONPath=".spec.mode",type=string
 // +kubebuilder:printcolumn:name=STATE,JSONPath=".status.state",type=string
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -56,6 +62,8 @@ type IPAMRange struct {
 }
 
 type IPAMRangeSpec struct {
+	// +optional
+	Mode   string   `json:"mode,omitempty"`
 	Ranges []string `json:"ranges"`
 
 	// +optional
@@ -63,4 +71,22 @@ type IPAMRangeSpec struct {
 }
 type IPAMRangeStatus struct {
 	types.StandardObjectStatus `json:",inline"`
+	// + optional
+	RoundRobin []string `json:"roundRobin,omitempty"`
+}
+
+func (this *IPAMRange) GetState() []net.IP {
+	state := []net.IP{}
+	for _, s := range this.Status.RoundRobin {
+		_, cidr, err := net.ParseCIDR(s)
+		if err != nil {
+			continue
+		}
+		ones, _ := cidr.Mask.Size()
+		for len(state) <= ones {
+			state = append(state, nil)
+		}
+		state[ones] = cidr.IP
+	}
+	return state
 }

@@ -30,7 +30,7 @@ func (in *IPAMRange) DeepCopyInto(out *IPAMRange) {
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
-	out.Status = in.Status
+	in.Status.DeepCopyInto(&out.Status)
 	return
 }
 
@@ -110,6 +110,11 @@ func (in *IPAMRangeSpec) DeepCopy() *IPAMRangeSpec {
 func (in *IPAMRangeStatus) DeepCopyInto(out *IPAMRangeStatus) {
 	*out = *in
 	in.StandardObjectStatus.DeepCopyInto(&out.StandardObjectStatus)
+	if in.RoundRobin != nil {
+		in, out := &in.RoundRobin, &out.RoundRobin
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
