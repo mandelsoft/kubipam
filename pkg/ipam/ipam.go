@@ -198,7 +198,7 @@ func (this *IPAM) getNext(reqsize int) net.IP {
 
 func (this *IPAM) setNext(cidr *net.IPNet) {
 	if this.roundRobin {
-		this.nextAlloc[CIDRNetMaskSize(cidr)] = IPAdd(cidr.IP, CIDRHostSize(cidr))
+		this.nextAlloc[CIDRNetMaskSize(cidr)] = IPAddInt(cidr.IP, CIDRHostSize(cidr))
 	}
 }
 
@@ -214,7 +214,7 @@ func (this *IPAM) Alloc(reqsize int) *net.IPNet {
 		for b := this.block; b != nil; b = b.next {
 			s := b.Size()
 			if next != nil {
-				if IPDiff(CIDRLastIP(b.cidr), next) < 0 {
+				if IPCmp(CIDRLastIP(b.cidr), next) < 0 {
 					continue
 				}
 			}
@@ -252,7 +252,7 @@ func (this *IPAM) split(b *Block, reqsize int) *Block {
 	for b.Size() < reqsize && b.canSplit() {
 		b.split()
 		if next != nil {
-			if IPDiff(b.next.cidr.IP, next) <= 0 {
+			if IPCmp(b.next.cidr.IP, next) <= 0 {
 				b = b.next
 			}
 		}

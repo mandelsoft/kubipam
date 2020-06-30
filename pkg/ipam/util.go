@@ -35,6 +35,14 @@ func sub(a, b net.IPMask) []byte {
 	return new
 }
 
+func inv(a []byte) []byte {
+	new := make(net.IPMask, len(a), len(a))
+	for i, v := range a {
+		new[i] = ^v
+	}
+	return new
+}
+
 func or(a, b []byte) []byte {
 	if len(a) != len(b) {
 		return nil

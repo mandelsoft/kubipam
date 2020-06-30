@@ -40,7 +40,7 @@ func (this *IPRange) String() string {
 func ParseIPRange(str string) (*IPRange, error) {
 	parts := strings.Split(str, "-")
 	if len(parts) <= 2 {
-		start := net.ParseIP(strings.ToLower(parts[0]))
+		start := ParseIP(strings.ToLower(parts[0]))
 		if start != nil {
 			if len(parts) == 1 {
 				return &IPRange{
@@ -48,9 +48,12 @@ func ParseIPRange(str string) (*IPRange, error) {
 					End:   start,
 				}, nil
 			}
-			end := net.ParseIP(strings.ToLower(parts[1]))
+			end := ParseIP(strings.ToLower(parts[1]))
 			if end != nil {
-				if IPDiff(end, start) < 0 {
+				if len(start) != len(end) {
+					return nil, fmt.Errorf("invalid ip range %q: start and end ip have different version", str)
+				}
+				if IPCmp(end, start) < 0 {
 					return nil, fmt.Errorf("invalid ip range %q: end of range before start", str)
 				}
 				return &IPRange{
@@ -60,11 +63,11 @@ func ParseIPRange(str string) (*IPRange, error) {
 			}
 		} else {
 			if len(parts) == 1 {
-				_, cidr, err := net.ParseCIDR(parts[0])
+				cidr, err := ParseCIDR(parts[0])
 				if err == nil {
 					return &IPRange{
-						Start: cidr.IP.To16(),
-						End:   CIDRLastIP(cidr).To16(),
+						Start: CIDRFirstIP(cidr),
+						End:   CIDRLastIP(cidr),
 					}, nil
 				}
 			}
@@ -105,7 +108,7 @@ func MustParseIPRanges(str ...string) IPRanges {
 type IPRanges []*IPRange
 
 func (p IPRanges) Len() int           { return len(p) }
-func (p IPRanges) Less(i, j int) bool { return IPDiff(p[i].Start, p[j].Start) < 0 }
+func (p IPRanges) Less(i, j int) bool { return IPCmp(p[i].Start, p[j].Start) < 0 }
 func (p IPRanges) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 func (this IPRanges) String() string {
@@ -123,8 +126,8 @@ func NormalizeIPRanges(ranges ...*IPRange) IPRanges {
 	sort.Sort(IPRanges(ranges))
 
 	for i := 0; i < len(ranges)-1; i++ {
-		if IPDiff(ranges[i].End, ranges[i+1].Start) >= 0 {
-			if IPDiff(ranges[i].End, ranges[i+1].End) >= 0 {
+		if IPCmp(ranges[i].End, ranges[i+1].Start) >= 0 {
+			if IPCmp(ranges[i].End, ranges[i+1].End) >= 0 {
 				ranges = append(ranges[:i+1], ranges[i+2:]...)
 			} else {
 				ranges = append(append(ranges[:i], &IPRange{ranges[i].Start, ranges[i+1].End}), ranges[i+2:]...)
@@ -140,7 +143,7 @@ func NormalizeIPRanges(ranges ...*IPRange) IPRanges {
 type CIDRList []*net.IPNet
 
 func (p CIDRList) Len() int           { return len(p) }
-func (p CIDRList) Less(i, j int) bool { return IPDiff(p[i].IP, p[j].IP) < 0 }
+func (p CIDRList) Less(i, j int) bool { return IPCmp(p[i].IP, p[j].IP) < 0 }
 func (p CIDRList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 func (this *CIDRList) String() string {
@@ -221,12 +224,12 @@ func Excludes(cidr *net.IPNet, ranges ...*IPRange) (CIDRList, error) {
 		return nil, nil
 	}
 	cidr = CIDRNet(cidr)
-	if d := IPDiff(cidr.IP, ranges[0].Start); d > 0 {
-		return nil, fmt.Errorf("range %s below cidr %s (%d)", ranges[0], cidr, d)
+	if IPCmp(cidr.IP, ranges[0].Start) > 0 {
+		return nil, fmt.Errorf("range %s below cidr %s", ranges[0], cidr)
 	}
-	last := CIDRSubIP(cidr, (1<<CIDRHostMaskSize(cidr))-1)
-	if d := IPDiff(last, ranges[len(ranges)-1].End); d < 0 {
-		return nil, fmt.Errorf("range %s above cidr %s (%d)", ranges[len(ranges)-1], cidr, -d)
+	last := CIDRLastIP(cidr)
+	if IPCmp(last, ranges[len(ranges)-1].End) < 0 {
+		return nil, fmt.Errorf("range %s above cidr %s", ranges[len(ranges)-1], cidr)
 	}
 
 	var excl CIDRList

@@ -28,11 +28,11 @@ import (
 var _ = Describe("Range", func() {
 
 	Context("parse", func() {
-		ip1 := net.ParseIP("10.0.1.0")
-		ip2 := net.ParseIP("10.1.0.0")
+		ip1 := ParseIP("10.0.1.0")
+		ip2 := ParseIP("10.1.0.0")
 
-		ip3 := net.ParseIP("10.0.0.0")
-		ip4 := net.ParseIP("10.0.0.255")
+		ip3 := ParseIP("10.0.0.0")
+		ip4 := ParseIP("10.0.0.255")
 
 		It("single ip", func() {
 			Expect(ParseIPRange("10.0.1.0")).To(Equal(&IPRange{ip1, ip1}))

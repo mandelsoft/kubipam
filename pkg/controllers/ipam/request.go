@@ -114,21 +114,16 @@ func (this *Reconciler) reconcileRequest(logger logger.LogContext, obj resources
 		var cidr *net.IPNet
 		if r.Spec.Request != "" {
 			var ip net.IP
-			var c *net.IPNet
-			ip, c, err = net.ParseCIDR(strings.TrimSpace(r.Spec.Request))
+			cidr, err = ipam.ParseCIDR(strings.TrimSpace(r.Spec.Request))
 			if err != nil {
-				ip = net.ParseIP(strings.TrimSpace(r.Spec.Request))
+				ip = ipam.ParseIP(strings.TrimSpace(r.Spec.Request))
 				if ip == nil {
 					return reconcile.UpdateStatus(logger, resources.NewStandardStatusUpdate(logger, obj, api.STATE_INVALID,
 						fmt.Sprintf("invalid request cidr or ip %s: %s", r.Spec.Request, err)))
 				}
-				c = ipam.IPtoCIDR(ip)
-			}
-			if !ip.Equal(c.IP) {
 				cidr = ipam.IPtoCIDR(ip)
-			} else {
-				cidr = c
 			}
+
 			if !ipr.ipam.Busy(cidr) {
 				err = fmt.Errorf("%s already busy", cidr)
 				cidr = nil

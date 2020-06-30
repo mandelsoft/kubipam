@@ -37,7 +37,7 @@ func (this *Block) canAlloc(next net.IP, reqsize int) bool {
 	if s > reqsize {
 		return false
 	}
-	if next != nil && IPDiff(CIDRLastIP(this.cidr), next) < 0 {
+	if next != nil && IPCmp(CIDRLastIP(this.cidr), next) < 0 {
 		return false
 	}
 
@@ -45,7 +45,7 @@ func (this *Block) canAlloc(next net.IP, reqsize int) bool {
 		n := reqsize - l + MAX_BITMAP_NET
 		start := 0
 		if next != nil {
-			start = int(IPDiff(next, this.cidr.IP))
+			start = int(IPDiff(next, this.cidr.IP).Int64())
 		}
 		return this.busy.canAllocate2(start, n) >= 0
 	}
@@ -115,7 +115,7 @@ func (this *Block) alloc(next net.IP, reqsize int) *net.IPNet {
 		n := reqsize - l + MAX_BITMAP_NET
 		start := 0
 		if next != nil {
-			start = int(IPDiff(next, this.cidr.IP))
+			start = int(IPDiff(next, this.cidr.IP).Int64())
 		}
 		ip := this.busy.allocate2(start, n)
 

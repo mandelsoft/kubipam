@@ -19,18 +19,43 @@
 package ipam
 
 import (
+	"math/big"
 	"net"
 )
 
-func MustParseCIDR(s string) *net.IPNet {
+var intOne = big.NewInt(1)
+var intZero = big.NewInt(0)
+
+func ParseCIDR(s string) (*net.IPNet, error) {
 	ip, cidr, err := net.ParseCIDR(s)
 	if err != nil {
-		panic(err)
+		return nil, err
+	}
+	if len(cidr.IP) == net.IPv4len {
+		return &net.IPNet{
+			IP:   ip.To4(),
+			Mask: cidr.Mask,
+		}, nil
+	}
+
+	if v4 := ip.To4(); v4 != nil {
+		return &net.IPNet{
+			IP:   v4,
+			Mask: cidr.Mask[12:],
+		}, nil
 	}
 	return &net.IPNet{
 		IP:   ip,
 		Mask: cidr.Mask,
+	}, nil
+}
+
+func MustParseCIDR(s string) *net.IPNet {
+	cidr, err := ParseCIDR(s)
+	if err != nil {
+		panic(err)
 	}
+	return cidr
 }
 
 func CIDRNetMaskSize(cidr *net.IPNet) int {
@@ -43,9 +68,10 @@ func CIDRHostMaskSize(cidr *net.IPNet) int {
 	return l - s
 }
 
-func CIDRHostSize(cidr *net.IPNet) int64 {
+func CIDRHostSize(cidr *net.IPNet) Int {
 	s, l := cidr.Mask.Size()
-	return 1 << (l - s)
+
+	return IntOne.LShift(uint(l - s))
 }
 
 func CIDRBits(cidr *net.IPNet) int {
@@ -117,10 +143,17 @@ func CIDRNet(cidr *net.IPNet) *net.IPNet {
 }
 
 func CIDRSubIP(cidr *net.IPNet, n int64) net.IP {
-	if n < 0 || n >= 1<<CIDRHostMaskSize(cidr) {
+	if n < 0 || CIDRHostSize(cidr).Cmp(Int64(n)) <= 0 {
 		return nil
 	}
 	return IPAdd(CIDRFirstIP(cidr), n)
+}
+
+func CIDRSubIPInt(cidr *net.IPNet, n Int) net.IP {
+	if n.Sgn() < 0 || CIDRHostSize(cidr).Cmp(n) <= 0 {
+		return nil
+	}
+	return IPAddInt(CIDRFirstIP(cidr), n)
 }
 
 func CIDRFirstIP(cidr *net.IPNet) net.IP {
@@ -128,7 +161,8 @@ func CIDRFirstIP(cidr *net.IPNet) net.IP {
 }
 
 func CIDRLastIP(cidr *net.IPNet) net.IP {
-	return CIDRSubIP(cidr, (1<<CIDRHostMaskSize(cidr))-1)
+	ip := CIDRFirstIP(cidr)
+	return or(ip, inv(cidr.Mask))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
