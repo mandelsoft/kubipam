@@ -32,6 +32,10 @@ func Int64(i int64) Int {
 	return Int(*big.NewInt(i))
 }
 
+func (this Int) String() string {
+	return (*big.Int)(&this).String()
+}
+
 func (this Int) LShift(n uint) Int {
 	r := big.Int{}
 	return Int(*r.Lsh((*big.Int)(&this), n))

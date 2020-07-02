@@ -37,6 +37,13 @@ func (this *IPRange) String() string {
 	return fmt.Sprintf("%s-%s", this.Start, this.End)
 }
 
+func (this *IPRange) Contains(ip net.IP) bool {
+	if IPCmp(this.Start, ip) > 0 {
+		return false
+	}
+	return IPCmp(this.End, ip) >= 0
+}
+
 func ParseIPRange(str string) (*IPRange, error) {
 	parts := strings.Split(str, "-")
 	if len(parts) <= 2 {
@@ -120,6 +127,15 @@ func (this IPRanges) String() string {
 		s = s + ", " + r.String()
 	}
 	return "[" + s[2:] + "]"
+}
+
+func (this IPRanges) Contains(ip net.IP) bool {
+	for _, r := range this {
+		if r.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func NormalizeIPRanges(ranges ...*IPRange) IPRanges {

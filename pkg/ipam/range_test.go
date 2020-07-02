@@ -60,6 +60,20 @@ var _ = Describe("Range", func() {
 		})
 	})
 
+	Context("range", func() {
+		r := MustParseIPRange("10.0.1.0-10.0.3.0")
+		It("contains border", func() {
+			Expect(r.Contains(ParseIP("10.0.1.0"))).To(BeTrue())
+			Expect(r.Contains(ParseIP("10.0.3.0"))).To(BeTrue())
+		})
+		It("contains", func() {
+			Expect(r.Contains(ParseIP("10.0.2.0"))).To(BeTrue())
+		})
+		It("not contains", func() {
+			Expect(r.Contains(ParseIP("10.0.0.255"))).To(BeFalse())
+			Expect(r.Contains(ParseIP("10.0.3.1"))).To(BeFalse())
+		})
+	})
 	Context("ranges", func() {
 		It("sorts", func() {
 			rs := MustParseIPRanges("10.0.1.0-10.0.1.10", "10.0.2.0-10.0.2.10", "10.0.0.0-10.0.0.10")
@@ -77,6 +91,20 @@ var _ = Describe("Range", func() {
 			rs := MustParseIPRanges("10.0.1.0-10.0.1.10", "10.0.1.1-10.0.1.3", "10.0.0.0-10.0.0.10")
 
 			Expect(NormalizeIPRanges(rs...).String()).To(Equal("[10.0.0.0-10.0.0.10, 10.0.1.0-10.0.1.10]"))
+		})
+
+		It("contains", func() {
+			rs := MustParseIPRanges("10.0.1.0-10.0.1.10", "10.0.1.20-10.0.1.30")
+
+			Expect(rs.Contains(ParseIP("10.0.1.5"))).To(BeTrue())
+			Expect(rs.Contains(ParseIP("10.0.1.25"))).To(BeTrue())
+		})
+		It("not contains", func() {
+			rs := MustParseIPRanges("10.0.1.0-10.0.1.10", "10.0.1.20-10.0.1.30")
+
+			Expect(rs.Contains(ParseIP("10.0.0.0"))).To(BeFalse())
+			Expect(rs.Contains(ParseIP("10.0.1.15"))).To(BeFalse())
+			Expect(rs.Contains(ParseIP("10.0.1.35"))).To(BeFalse())
 		})
 	})
 
