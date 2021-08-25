@@ -57,7 +57,7 @@ func (this *Reconciler) setupIPAM(logger logger.LogContext, obj resources.Object
 	}
 	if r.Spec.Mode == api.MODE_ROUNDROBIN {
 		ipr.SetRoundRobin(true)
-		ipr.SetState(r.GetState())
+		ipr.SetState(nil, r.GetState())
 	} else {
 		ipr.SetRoundRobin(false)
 	}

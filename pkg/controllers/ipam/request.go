@@ -148,7 +148,7 @@ func (this *Reconciler) reconcileRequest(logger logger.LogContext, obj resources
 			_, err = resources.ModifyStatus(ipr.object, func(mod *resources.ModificationState) error {
 				r := mod.Object().Data().(*api.IPAMRange)
 
-				cur := ipr.ipam.State()
+				_, cur := ipr.ipam.State()
 				state := []string{}
 				for i := 0; i < len(cur); i++ {
 					if cur[i] != nil {
