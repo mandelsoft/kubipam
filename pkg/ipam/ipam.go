@@ -24,6 +24,7 @@ import (
 )
 
 type IPAM struct {
+	ranges     CIDRList
 	block      *Block
 	nextAlloc  []net.IP
 	roundRobin bool
@@ -45,6 +46,7 @@ func NewIPAM(cidr *net.IPNet, ranges ...*IPRange) (*IPAM, error) {
 
 	_ = nextAlloc
 	ipam := &IPAM{
+		ranges:    []*net.IPNet{&copy},
 		block:     block,
 		nextAlloc: nextAlloc,
 	}
@@ -102,6 +104,7 @@ func NewIPAMForRanges(ranges IPRanges) (*IPAM, error) {
 	}
 	_ = nextAlloc
 	ipam := &IPAM{
+		ranges:    cidrs,
 		nextAlloc: nextAlloc,
 	}
 
@@ -143,6 +146,10 @@ func (this *IPAM) SetRoundRobin(b bool) {
 		this.nextAlloc = make([]net.IP, len(this.nextAlloc), len(this.nextAlloc))
 	}
 	this.roundRobin = b
+}
+
+func (this *IPAM) Ranges() CIDRList {
+	return this.ranges.Copy()
 }
 
 func (this *IPAM) State() ([]string, []net.IP) {

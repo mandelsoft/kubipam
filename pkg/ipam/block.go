@@ -65,7 +65,6 @@ func ParseBlock(s string) *Block {
 		}
 	}
 
-
 }
 
 type Block struct {
