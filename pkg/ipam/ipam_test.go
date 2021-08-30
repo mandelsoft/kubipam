@@ -159,7 +159,7 @@ var _ = Describe("IPAM", func() {
 			r := ipam.Alloc(28)
 			Expect(r.String()).To(Equal("10.0.0.0/28"))
 
-			Expect(ipam.block.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 11111111 11111111]"))
+			Expect(ipam.block.String()).To(Equal("10.0.0.0/26[11111111 11111111]"))
 		})
 
 		It("check 28/30/28", func() {
@@ -172,7 +172,7 @@ var _ = Describe("IPAM", func() {
 			r3 := ipam.Alloc(28)
 			Expect(r3.String()).To(Equal("10.0.0.32/28"))
 
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 11111111 11111111 00000000 00001111 11111111 11111111]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[11111111 11111111 00000000 00001111 11111111 11111111]"))
 		})
 
 		It("free 28", func() {
@@ -190,15 +190,15 @@ var _ = Describe("IPAM", func() {
 
 			r1 := MustParseCIDR("10.0.0.8/29")
 			Expect(ipam.Busy(r1)).To(BeTrue())
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 11111111 00000000]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[11111111 00000000]"))
 
 			r2 := MustParseCIDR("10.0.0.12/30")
 			Expect(ipam.Busy(r2)).To(BeFalse())
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 11111111 00000000]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[11111111 00000000]"))
 
 			r3 := MustParseCIDR("10.0.0.0/27")
 			Expect(ipam.Busy(r3)).To(BeFalse())
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 11111111 00000000]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[11111111 00000000]"))
 
 			ipam.Free(r1)
 			Expect(ipam.String()).To(Equal("10.0.0.0/26[free]"))
@@ -244,9 +244,9 @@ var _ = Describe("IPAM", func() {
 			Expect(r3.String()).To(Equal("10.0.0.32/28"))
 
 			Expect(ipam.Free(r1)).To(BeTrue())
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 11111111 11111111 00000000 00001111 00000000 00000000]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[11111111 11111111 00000000 00001111 00000000 00000000]"))
 			Expect(ipam.Free(r3)).To(BeTrue())
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00001111 00000000 00000000]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00001111 00000000 00000000]"))
 			Expect(ipam.Free(r2)).To(BeTrue())
 			Expect(ipam.String()).To(Equal("10.0.0.0/26[free]"))
 
@@ -270,11 +270,11 @@ var _ = Describe("IPAM", func() {
 
 			r1 := ipam.Alloc(32)
 			Expect(r1.String()).To(Equal("10.0.0.0/32"))
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000001], 10.0.0.64/26[free], 10.0.0.128/25[free]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000001], 10.0.0.64/26[free], 10.0.0.128/25[free]"))
 
 			r2 := ipam.Alloc(25)
 			Expect(r2.String()).To(Equal("10.0.0.128/25"))
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000001], 10.0.0.64/26[free], 10.0.0.128/25[busy]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000001], 10.0.0.64/26[free], 10.0.0.128/25[busy]"))
 		})
 
 		It("no round robin", func() {
@@ -323,11 +323,11 @@ var _ = Describe("IPAM", func() {
 
 			r1 := ipam.Alloc(32)
 			Expect(r1.String()).To(Equal("10.0.0.0/32"))
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000001], 10.0.0.64/26[free], 10.0.0.128/25[free]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000001], 10.0.0.64/26[free], 10.0.0.128/25[free]"))
 
 			r2 := ipam.Alloc(25)
 			Expect(r2.String()).To(Equal("10.0.0.128/25"))
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000001], 10.0.0.64/26[free], 10.0.0.128/25[busy]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000001], 10.0.0.64/26[free], 10.0.0.128/25[busy]"))
 
 			Expect(ipam.Free(r1)).To(BeTrue())
 			Expect(ipam.String()).To(Equal("10.0.0.0/25[free], 10.0.0.128/25[busy]"))
@@ -345,13 +345,13 @@ var _ = Describe("IPAM", func() {
 		It("scenario 2", func() {
 			ipam, _ := NewIPAM(cidr)
 			ipam.Busy(MustParseCIDR("10.0.0.0/29"))
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000000 11111111], 10.0.0.64/26[free], 10.0.0.128/25[free]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[11111111], 10.0.0.64/26[free], 10.0.0.128/25[free]"))
 			ipam.Busy(MustParseCIDR("10.0.0.8/32"))
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000001 11111111], 10.0.0.64/26[free], 10.0.0.128/25[free]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000001 11111111], 10.0.0.64/26[free], 10.0.0.128/25[free]"))
 			ipam.Busy(MustParseCIDR("10.0.0.128/25"))
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000001 11111111], 10.0.0.64/26[free], 10.0.0.128/25[busy]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000001 11111111], 10.0.0.64/26[free], 10.0.0.128/25[busy]"))
 			ipam.Busy(MustParseCIDR("10.0.0.127/32"))
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000001 11111111], 10.0.0.64/26[10000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000], 10.0.0.128/25[busy]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000001 11111111], 10.0.0.64/26[10000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000], 10.0.0.128/25[busy]"))
 		})
 	})
 
@@ -361,13 +361,13 @@ var _ = Describe("IPAM", func() {
 		It("initializes ipam correctly", func() {
 			ipam, _ := NewIPAM(cidr, MustParseIPRange("10.0.0.10-10.0.0.250"))
 
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000011 11111111], 10.0.0.64/26[free], 10.0.0.128/26[free], 10.0.0.192/26[11111000 00000000 00000000 00000000 00000000 00000000 00000000 00000000]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000011 11111111], 10.0.0.64/26[free], 10.0.0.128/26[free], 10.0.0.192/26[11111000 00000000 00000000 00000000 00000000 00000000 00000000 00000000]"))
 		})
 
 		It("initializes ipam correctly with sparse range", func() {
 			ipam, _ := NewIPAM(cidr, MustParseIPRange("10.0.0.10-10.0.0.126"))
 
-			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000011 11111111], 10.0.0.64/26[10000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000]"))
+			Expect(ipam.String()).To(Equal("10.0.0.0/26[00000011 11111111], 10.0.0.64/26[10000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000]"))
 		})
 	})
 
@@ -431,7 +431,7 @@ var _ = Describe("IPAM", func() {
 				busy: 255,
 				cidr: bitmap,
 			}
-			Expect(b.String()).To(Equal("10.0.0.0/26[00000000 00000000 00000000 00000000 00000000 00000000 00000000 11111111]"))
+			Expect(b.String()).To(Equal("10.0.0.0/26[11111111]"))
 			Expect(ParseBlock(b.String())).To(Equal(b))
 		})
 		It("serializes bitmap block", func() {
@@ -490,4 +490,77 @@ var _ = Describe("IPAM", func() {
 		})
 
 	})
+	Context("small range", func() {
+		_, cidr, _ := net.ParseCIDR("10.0.0.0/28")
+
+		It("initializes ipam correctly", func() {
+			ipam, _ := NewIPAM(cidr)
+
+			Expect(ipam.block.next).To(BeNil())
+			Expect(ipam.block.prev).To(BeNil())
+
+			Expect(ipam.String()).To(Equal("10.0.0.0/28[free]"))
+		})
+		It("allocates 8", func() {
+			ipam, _ := NewIPAM(cidr)
+
+			cidr := ipam.Alloc(29)
+			Expect(cidr).NotTo(BeNil())
+			Expect(cidr.String()).To(Equal("10.0.0.0/29"))
+
+			Expect(ipam.String()).To(Equal("10.0.0.0/28[11111111]"))
+		})
+		It("allocates 2*8", func() {
+			ipam, _ := NewIPAM(cidr)
+
+			cidr := ipam.Alloc(29)
+			Expect(cidr).NotTo(BeNil())
+			Expect(cidr.String()).To(Equal("10.0.0.0/29"))
+
+			cidr = ipam.Alloc(29)
+			Expect(cidr).NotTo(BeNil())
+			Expect(cidr.String()).To(Equal("10.0.0.8/29"))
+
+			Expect(ipam.String()).To(Equal("10.0.0.0/28[11111111 11111111]"))
+		})
+
+		It("allocates 2*8 + fails third alloc", func() {
+			ipam, _ := NewIPAM(cidr)
+
+			cidr := ipam.Alloc(29)
+			Expect(cidr).NotTo(BeNil())
+			Expect(cidr.String()).To(Equal("10.0.0.0/29"))
+
+			cidr = ipam.Alloc(29)
+			Expect(cidr).NotTo(BeNil())
+			Expect(cidr.String()).To(Equal("10.0.0.8/29"))
+
+			cidr = ipam.Alloc(29)
+			Expect(cidr).To(BeNil())
+
+			Expect(ipam.String()).To(Equal("10.0.0.0/28[11111111 11111111]"))
+		})
+
+		It("round robin", func() {
+			ipam, _ := NewIPAM(cidr)
+			ipam.SetRoundRobin(true)
+
+			cidr := ipam.Alloc(29)
+			Expect(cidr).NotTo(BeNil())
+			Expect(cidr.String()).To(Equal("10.0.0.0/29"))
+			Expect(ipam.Free(cidr)).To(BeTrue())
+
+			cidr = ipam.Alloc(29)
+			Expect(cidr).NotTo(BeNil())
+			Expect(cidr.String()).To(Equal("10.0.0.8/29"))
+			Expect(ipam.Free(cidr)).To(BeTrue())
+
+			cidr = ipam.Alloc(29)
+			Expect(cidr).NotTo(BeNil())
+			Expect(cidr.String()).To(Equal("10.0.0.0/29"))
+
+			Expect(ipam.String()).To(Equal("10.0.0.0/28[11111111]"))
+		})
+	})
+
 })

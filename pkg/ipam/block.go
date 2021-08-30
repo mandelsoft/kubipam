@@ -89,7 +89,8 @@ func (this *Block) canAlloc(next net.IP, reqsize int) bool {
 		if next != nil {
 			start = int(IPDiff(next, this.cidr.IP).Int64())
 		}
-		return this.busy.canAllocate2(start, n) >= 0
+		f:= this.busy.canAllocate2(start, n)
+		return f >= 0 && f < 1<<(l-s)
 	}
 	return this.busy == 0
 }
@@ -263,7 +264,9 @@ func (this *Block) String() string {
 			t := fmt.Sprintf("%064b", this.busy)
 			msg = ""
 			for i := 0; i < MAX_BITMAP_SIZE; i += 8 {
-				msg += " " + t[i:i+8]
+				if msg != "" || t[i:i+8] != "00000000" {
+					msg += " " + t[i:i+8]
+				}
 			}
 			msg = msg[1:]
 		} else {
