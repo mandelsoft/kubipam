@@ -89,7 +89,7 @@ func (this *Block) canAlloc(next net.IP, reqsize int) bool {
 		if next != nil {
 			start = int(IPDiff(next, this.cidr.IP).Int64())
 		}
-		f:= this.busy.canAllocate2(start, n)
+		f := this.busy.canAllocate2(start, n)
 		return f >= 0 && f < 1<<(l-s)
 	}
 	return this.busy == 0

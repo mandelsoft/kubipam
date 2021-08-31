@@ -327,8 +327,12 @@ func Includes(ranges ...*IPRange) (CIDRList, error) {
 				cidr = CIDRExtend(cidr)
 			}
 			l, u := CIDRSplit(cidr)
-			addIncludes(&incl, l, false, r.Start)
-			addIncludes(&incl, u, true, r.End)
+			if l == nil {
+				incl.Add(cidr)
+			} else {
+				addIncludes(&incl, l, false, r.Start)
+				addIncludes(&incl, u, true, r.End)
+			}
 		}
 
 		if len(incl) > 1 {

@@ -149,10 +149,10 @@ func hostmasksizeSpecType(s string) (RequestSpec, bool, error) {
 		return nil, false, nil
 	}
 	spec, _, err := netmasksizeSpecType(s[1:])
-	if spec == nil || err!=nil {
+	if spec == nil || err != nil {
 		return spec, true, err
 	}
-	return &hostmasksizeSpec{*(spec.(*netmasksizeSpec)) }, false, nil
+	return &hostmasksizeSpec{*(spec.(*netmasksizeSpec))}, false, nil
 }
 
 func (this *hostmasksizeSpec) String() string {
@@ -160,7 +160,7 @@ func (this *hostmasksizeSpec) String() string {
 }
 
 func (this *hostmasksizeSpec) Alloc(ipam *IPAM) (*net.IPNet, error) {
-	return this.alloc(ipam, ipam.Bits() - this.size)
+	return this.alloc(ipam, ipam.Bits()-this.size)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -270,7 +270,7 @@ func (this *cidrSpec) Alloc(ipam *IPAM) (*net.IPNet, error) {
 
 type subSpec struct {
 	specsupport
-	host bool
+	host  bool
 	size  int
 	index int
 }
@@ -278,10 +278,10 @@ type subSpec struct {
 func subSpecType(s string) (RequestSpec, bool, error) {
 	idx := strings.Index(s, "/")
 	if idx >= 0 {
-		start:=idx+1
-		host:=false
-		if s[start]=='%' {
-			host=true
+		start := idx + 1
+		host := false
+		if s[start] == '%' {
+			host = true
 			start++
 		}
 		size, err := strconv.ParseInt(s[start:], 10, 32)
@@ -325,9 +325,9 @@ func (this *subSpec) Bits() int {
 func (this *subSpec) Alloc(ipam *IPAM) (*net.IPNet, error) {
 	index := this.index
 	var cidr *net.IPNet
-	size:=this.size
+	size := this.size
 	if this.host {
-		size=ipam.Bits()-size
+		size = ipam.Bits() - size
 	}
 	for _, r := range ipam.ranges {
 		if CIDRNetMaskSize(r) > size {
