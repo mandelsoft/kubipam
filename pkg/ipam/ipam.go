@@ -141,6 +141,35 @@ func NewIPAMForRanges(ranges IPRanges) (*IPAM, error) {
 	return ipam, nil
 }
 
+func (this *IPAM) AddCIDRs(list CIDRList) {
+	toAdd := this.ranges.Additional(list)
+
+	this.ranges = append(this.ranges, toAdd...)
+	this.ranges.Normalize()
+	for _, a := range toAdd {
+		b := &Block{
+			cidr: a,
+		}
+
+		c := this.block
+		for c != nil {
+			if IPCmp(b.cidr.IP, c.cidr.IP) < 0 {
+				b.next = c
+				b.prev = c.prev
+				if c.prev == nil {
+					this.block = b
+				} else {
+					c.prev.next = b
+				}
+				c.prev = b
+				this.join(b)
+				break
+			}
+			c = c.next
+		}
+	}
+}
+
 func (this *IPAM) SetRoundRobin(b bool) {
 	if !b && this.roundRobin {
 		this.nextAlloc = make([]net.IP, len(this.nextAlloc), len(this.nextAlloc))

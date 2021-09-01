@@ -563,4 +563,77 @@ var _ = Describe("IPAM", func() {
 		})
 	})
 
+	Context("extend ipam", func() {
+		_, cidr, _ := net.ParseCIDR("10.9.0.0/16")
+
+		It("adds buddy on empty ipam", func() {
+			ipam, _ := NewIPAM(cidr)
+
+			_, add, _ := net.ParseCIDR("10.8.0.0/16")
+			_, exp, _ := net.ParseCIDR("10.8.0.0/15")
+
+			ipam.AddCIDRs(CIDRList{add})
+
+			Expect(ipam.Ranges()).To(Equal(CIDRList{exp}))
+
+			blocks, _ := ipam.State()
+			Expect(blocks).To(Equal([]string{"10.8.0.0/15[free]"}))
+		})
+		It("adds buddy on non empty ipam", func() {
+			ipam, _ := NewIPAM(cidr)
+
+			Expect(ipam.Alloc(17)).NotTo(BeNil())
+			_, add, _ := net.ParseCIDR("10.8.0.0/16")
+			_, exp, _ := net.ParseCIDR("10.8.0.0/15")
+
+			ipam.AddCIDRs(CIDRList{add})
+
+			Expect(ipam.Ranges()).To(Equal(CIDRList{exp}))
+
+			blocks, _ := ipam.State()
+			Expect(blocks).To(Equal([]string{"10.8.0.0/16[free]", "10.9.0.0/17[busy]", "10.9.128.0/17[free]"}))
+		})
+
+		It("add joinable intermediate cidr", func() {
+			ranges, _ := ParseIPRanges("10.8.0.0/16", "10.10.0.0/16", "10.11.0.0/16")
+			ipam, _ := NewIPAMForRanges(ranges)
+
+			r1 := MustParseCIDR("10.8.0.0/16")
+			r2 := MustParseCIDR("10.10.0.0/15")
+			r3 := MustParseCIDR("10.8.0.0/14")
+			Expect(ipam.Ranges()).To(Equal(CIDRList{r1, r2}))
+
+			_, add, _ := net.ParseCIDR("10.9.0.0/16")
+
+			ipam.AddCIDRs(CIDRList{add})
+			Expect(ipam.Ranges()).To(Equal(CIDRList{r3}))
+
+			blocks, _ := ipam.State()
+			Expect(blocks).To(Equal([]string{"10.8.0.0/14[free]"}))
+
+		})
+
+		It("add joinable intermediate cidr after allocation", func() {
+			ranges, _ := ParseIPRanges("10.8.0.0/16", "10.10.0.0/16", "10.11.0.0/16")
+			ipam, _ := NewIPAMForRanges(ranges)
+
+			a1 := MustParseCIDR("10.8.0.0/17")
+
+			r1 := MustParseCIDR("10.8.0.0/16")
+			r2 := MustParseCIDR("10.10.0.0/15")
+			r3 := MustParseCIDR("10.8.0.0/14")
+			Expect(ipam.Ranges()).To(Equal(CIDRList{r1, r2}))
+
+			Expect(ipam.Busy(a1)).To(BeTrue())
+
+			_, add, _ := net.ParseCIDR("10.9.0.0/16")
+
+			ipam.AddCIDRs(CIDRList{add})
+			Expect(ipam.Ranges()).To(Equal(CIDRList{r3}))
+
+			blocks, _ := ipam.State()
+			Expect(blocks).To(Equal([]string{"10.8.0.0/17[busy]", "10.8.128.0/17[free]", "10.9.0.0/16[free]", "10.10.0.0/15[free]"}))
+
+		})
+	})
 })

@@ -290,7 +290,5 @@ func (this *Block) Size() int {
 }
 
 func (this *Block) IsUpper() bool {
-	ones, bits := this.cidr.Mask.Size()
-	delta := sub(this.cidr.Mask, net.CIDRMask(ones-1, bits))
-	return !isZero(and(delta, this.cidr.IP))
+	return CIDRIsUpper(this.cidr)
 }
