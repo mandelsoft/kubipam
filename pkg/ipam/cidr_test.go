@@ -19,6 +19,8 @@
 package ipam
 
 import (
+	"net"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -35,6 +37,53 @@ var _ = Describe("CIDR", func() {
 		})
 	})
 
+	Context("cidr list utils", func() {
+		c1, _ := ParseCIDR("10.0.0.0/16")
+		c2, _ := ParseCIDR("10.8.0.0/16")
+
+		c3, _ := ParseCIDR("10.8.8.0/24")
+		o, _ := ParseCIDR("9.8.8.0/24")
+
+		list := CIDRList{c1, c2}
+
+		It("empty", func() {
+			Expect(list.IsEmpty()).To(BeFalse())
+		})
+
+		It("contains ip", func() {
+			Expect(list.Contains(c3.IP)).To(BeTrue())
+		})
+		It("no contains ip", func() {
+			Expect(list.Contains(o.IP)).To(BeFalse())
+		})
+
+		It("contains cidr", func() {
+			Expect(list.ContainsCIDR(c3)).To(BeTrue())
+		})
+		It("not contains cidr", func() {
+			Expect(list.ContainsCIDR(o)).To(BeFalse())
+		})
+
+		It("ipmask ", func() {
+			m := net.CIDRMask(10, 32)
+			Expect(IPMaskClone(m)).To(Equal(m))
+		})
+
+		It("extend lower", func() {
+			cidr := MustParseCIDR("10.8.0.0/16")
+			r := MustParseCIDR("10.8.0.0/15")
+			Expect(CIDRExtend(cidr)).To(Equal(r))
+		})
+		It("extend upper", func() {
+			cidr := MustParseCIDR("10.9.0.0/16")
+			r := MustParseCIDR("10.8.0.0/15")
+			Expect(CIDRExtend(cidr)).To(Equal(r))
+		})
+		It("extend all", func() {
+			cidr := MustParseCIDR("0.0.0.0/0")
+			Expect(CIDRExtend(cidr)).To(BeNil())
+		})
+	})
 	Context("cidr contains", func() {
 		base, _ := ParseCIDR("10.0.0.0/8")
 		lower, _ := ParseCIDR("10.0.0.0/9")

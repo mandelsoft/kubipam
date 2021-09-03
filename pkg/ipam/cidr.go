@@ -227,19 +227,21 @@ func IPMaskClone(mask net.IPMask) net.IPMask {
 
 type CIDRList []*net.IPNet
 
-func (p CIDRList) Len() int { return len(p) }
-func (p CIDRList) Less(i, j int) bool {
-	d := IPCmp(p[i].IP, p[j].IP)
+func CIDRLess(a, b *net.IPNet) bool {
+	d := IPCmp(a.IP, b.IP)
 	switch {
 	case d < 0:
 		return true
 	case d > 0:
 		return false
 	default:
-		return CIDRNetMaskSize(p[i]) > CIDRNetMaskSize(p[j])
+		return CIDRNetMaskSize(a) > CIDRNetMaskSize(b)
 	}
 }
-func (p CIDRList) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+
+func (p CIDRList) Len() int           { return len(p) }
+func (p CIDRList) Less(i, j int) bool { return CIDRLess(p[i], p[j]) }
+func (p CIDRList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 func (this *CIDRList) String() string {
 	sep := "["
@@ -257,6 +259,10 @@ func (this *CIDRList) Add(cidrs ...*net.IPNet) {
 	*this = append(*this, cidrs...)
 }
 
+func (this *CIDRList) DeleteIndex(i int) {
+	(*this) = append((*this)[:i], (*this)[i+1:]...)
+}
+
 func (this CIDRList) IsEmpty() bool {
 	return len(this) == 0
 }
@@ -264,6 +270,15 @@ func (this CIDRList) IsEmpty() bool {
 func (this CIDRList) Contains(ip net.IP) bool {
 	for _, c := range this {
 		if c.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func (this CIDRList) ContainsCIDR(cidr *net.IPNet) bool {
+	for _, c := range this {
+		if CIDRContains(c, cidr) {
 			return true
 		}
 	}
@@ -283,10 +298,27 @@ func (this CIDRList) Additional(b CIDRList) CIDRList {
 	b = b.Copy()
 	a.Normalize()
 	b.Normalize()
+	return a.additional(b)
+}
 
+func (this *CIDRList) AddNormalized(list CIDRList) CIDRList {
+	toAdd := this.Additional(list)
+	this.Add(toAdd...)
+	this.Normalize()
+	return toAdd
+}
+
+func (this *CIDRList) DeleteNormalized(list CIDRList) CIDRList {
+	cur := *this
+	*this = list.Additional(*this)
+	toDel := this.Additional(cur)
+	return toDel
+}
+
+func (this CIDRList) additional(b CIDRList) CIDRList {
 	var result CIDRList
 
-	for _, o := range a {
+	for _, o := range this {
 		fo := CIDRFirstIP(o)
 		lo := CIDRLastIP(o)
 
@@ -378,4 +410,16 @@ func (this CIDRList) join(index int) (*net.IPNet, int) {
 		return CIDRExtend(this[lower]), lower
 	}
 	return nil, -1
+}
+
+func (this CIDRList) Equal(list CIDRList) bool {
+	if len(this) != len(list) {
+		return false
+	}
+	for i, e := range this {
+		if !CIDREqual(e, list[i]) {
+			return false
+		}
+	}
+	return true
 }

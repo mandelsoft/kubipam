@@ -25,6 +25,13 @@ import (
 	"strings"
 )
 
+func CIDRRange(cidr *net.IPNet) *IPRange {
+	return &IPRange{
+		Start: CIDRFirstIP(cidr),
+		End:   CIDRLastIP(cidr),
+	}
+}
+
 type IPRange struct {
 	Start net.IP
 	End   net.IP

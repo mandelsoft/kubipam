@@ -26,6 +26,13 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////
 
+func NewBlock(cidr *net.IPNet, bitmap Bitmap) *Block {
+	return &Block{
+		busy: bitmap,
+		cidr: cidr,
+	}
+}
+
 func ParseBlock(s string) *Block {
 	idx := strings.Index(s, "[")
 	if idx <= 0 || !strings.HasSuffix(s, "]") {
@@ -115,12 +122,33 @@ func (this *Block) isBusy() bool {
 	return this.busy != 0
 }
 
+func (this *Block) isCIDRBusy(cidr *net.IPNet) bool {
+	s, l := this.cidr.Mask.Size()
+	r := CIDRNetMaskSize(cidr)
+	if s > r {
+		return false
+	}
+	if !this.cidr.Contains(cidr.IP) {
+		return false
+	}
+
+	if l-s <= MAX_BITMAP_NET && s < r {
+		return this.busy.get(int(cidr.IP[len(cidr.IP)-1]&((1<<(l-s))-1)), r-l+MAX_BITMAP_NET) != 0
+	}
+
+	return this.busy != 0
+}
+
 func (this *Block) isCompletelyBusy() bool {
+	s := this.HostSize()
+	if s <= MAX_BITMAP_NET {
+		return this.busy&hostmask[s] == hostmask[s]
+	}
 	return this.busy == BITMAP_BUSY
 }
 
 func (this *Block) matchState(b *Block) bool {
-	return this.busy == b.busy && (this.busy == 0 || this.busy == Bitmap(0))
+	return this.busy == b.busy && (this.busy == 0 || this.isCompletelyBusy())
 }
 
 func (this *Block) set(cidr *net.IPNet, busy bool) bool {
@@ -134,7 +162,7 @@ func (this *Block) set(cidr *net.IPNet, busy bool) bool {
 	}
 
 	if s < r {
-		return this.busy.set(int(cidr.IP[len(cidr.IP)-1]&MAX_BITMAP_HOST_MASK), r-l+MAX_BITMAP_NET, busy)
+		return this.busy.set(int(cidr.IP[len(cidr.IP)-1]&((1<<(l-s))-1)), r-l+MAX_BITMAP_NET, busy)
 	}
 
 	if this.isBusy() == busy {
@@ -179,21 +207,27 @@ func (this *Block) alloc(next net.IP, reqsize int) *net.IPNet {
 
 func (this *Block) split() *Block {
 	ones, bits := this.cidr.Mask.Size()
-	if bits-ones <= MAX_BITMAP_NET {
+	hostsize := bits - ones
+	if hostsize == 0 {
 		return nil
 	}
-
 	mask := net.CIDRMask(ones+1, bits)
 	delta := sub(mask, this.cidr.Mask)
+	busy := this.busy
+	if hostsize <= MAX_BITMAP_NET {
+		busy = this.busy >> (1 << (hostsize - 1))
+		this.busy &= hostmask[hostsize-1]
+	}
 	upper := &Block{
 		cidr: &net.IPNet{
 			IP:   net.IP(or(this.cidr.IP, delta)),
 			Mask: mask,
 		},
-		busy: this.busy,
+		busy: busy,
 		prev: this,
 		next: this.next,
 	}
+
 	if this.next != nil {
 		this.next.prev = upper
 	}
@@ -240,7 +274,8 @@ func (this *Block) join() *Block {
 		return nil
 	}
 
-	if !lower.matchState(upper) {
+	hostsize := this.HostSize()
+	if !lower.matchState(upper) && hostsize >= MAX_BITMAP_NET {
 		return nil
 	}
 
@@ -253,6 +288,9 @@ func (this *Block) join() *Block {
 	lower.cidr = &net.IPNet{
 		IP:   lower.cidr.IP,
 		Mask: mask,
+	}
+	if hostsize < MAX_BITMAP_NET {
+		lower.busy = lower.busy | (upper.busy << (1 << hostsize))
 	}
 	return lower
 }
@@ -285,8 +323,11 @@ func (this *Block) Prev() *Block {
 }
 
 func (this *Block) Size() int {
-	ones, _ := this.cidr.Mask.Size()
-	return ones
+	return CIDRNetMaskSize(this.cidr)
+}
+
+func (this *Block) HostSize() int {
+	return CIDRHostMaskSize(this.cidr)
 }
 
 func (this *Block) IsUpper() bool {
