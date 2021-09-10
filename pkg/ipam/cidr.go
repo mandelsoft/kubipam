@@ -87,6 +87,10 @@ func CIDRClone(cidr *net.IPNet) *net.IPNet {
 	}
 }
 
+func CIDROverlap(a, b *net.IPNet) bool {
+	return a.Contains(b.IP) || b.Contains(a.IP)
+}
+
 func CIDREqual(a, b *net.IPNet) bool {
 	if a == b {
 		return true

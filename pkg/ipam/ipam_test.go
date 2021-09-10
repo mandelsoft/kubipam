@@ -1119,5 +1119,50 @@ var _ = Describe("IPAM", func() {
 			blocks, _ = ipam.State()
 			Expect(blocks).To(Equal([]string{"10.0.0.16/28[11111111]"}))
 		})
+
+		It("block deleted but not completely released ranges", func() {
+			ranges, err := ParseIPRanges("10.0.0.0/24")
+			Expect(err).To(Succeed())
+			ipam, err := NewIPAMForRanges(ranges)
+			Expect(err).To(Succeed())
+
+			a1 := MustParseCIDR("10.0.0.0/26")
+			a2 := MustParseCIDR("10.0.0.64/26")
+			a3 := MustParseCIDR("10.0.0.128/26")
+			a4 := MustParseCIDR("10.0.0.192/26")
+
+			r0 := MustParseCIDR("10.0.0.0/24")
+			r1 := MustParseCIDR("10.0.0.0/25")
+			r2 := MustParseCIDR("10.0.0.128/25")
+			Expect(ipam.Ranges()).To(Equal(CIDRList{r0}))
+
+			Expect(ipam.Busy(a1)).To(BeTrue())
+			Expect(ipam.Busy(a2)).To(BeTrue())
+			Expect(ipam.Busy(a3)).To(BeTrue())
+
+			//blocks, _ := ipam.State()
+
+			ipam.DeleteCIDRs(CIDRList{r1})
+
+			Expect(ipam.Ranges()).To(Equal(CIDRList{r2}))
+			Expect(ipam.PendingDeleted()).To(Equal(CIDRList{r1}))
+			Expect(ipam.Free(a1)).To(BeTrue())
+			Expect(ipam.PendingDeleted()).To(Equal(CIDRList{r1}))
+
+			// block deleted range for further allocation
+			Expect(ipam.Busy(a1)).To(BeFalse())
+			Expect(ipam.Alloc(26)).To(Equal(a4))
+
+			Expect(ipam.Free(a2)).To(BeTrue())
+			Expect(ipam.PendingDeleted()).To(Equal(CIDRList(nil)))
+
+			blocks, _ := ipam.State()
+			Expect(blocks).To(Equal([]string{
+				"10.0.0.128/25[busy]",
+			}))
+
+			Expect(ipam.Alloc(26)).To(BeNil())
+		})
+
 	})
 })

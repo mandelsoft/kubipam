@@ -385,7 +385,7 @@ func (this *IPAM) split(b *Block, reqsize int) *Block {
 func (this *IPAM) join(b *Block) {
 	for b != nil {
 		if len(this.deletePending) != 0 {
-			if CIDRHostMaskSize(b.cidr) <= MAX_BITMAP_NET {
+			if CIDRHostMaskSize(b.cidr) < MAX_BITMAP_NET {
 				// remember check block area: [b.prev.next...b.next]
 				// removing might create multiple splitted blocks in this area
 				p := &this.block
