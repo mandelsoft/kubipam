@@ -27,6 +27,38 @@ import (
 )
 
 var _ = Describe("IPAM", func() {
+	Context("empty", func() {
+		It("creates empty", func() {
+			ipam, err := NewIPAMForRanges(nil)
+			Expect(err).To(BeNil())
+			cidr := ipam.Alloc(32)
+			Expect(cidr).To(BeNil())
+		})
+		It("extends empty", func() {
+			_, cidr, _ := net.ParseCIDR("10.0.0.0/8")
+			_, alloc, _ := net.ParseCIDR("10.0.0.0/32")
+			ipam, err := NewIPAMForRanges(nil)
+			Expect(err).To(BeNil())
+			ipam.AddCIDRs(CIDRList{cidr})
+			a := ipam.Alloc(32)
+			Expect(a).To(Equal(alloc))
+		})
+		It("delete to empty", func() {
+			_, cidr, _ := net.ParseCIDR("10.0.0.0/8")
+			_, alloc, _ := net.ParseCIDR("10.0.0.0/32")
+			ipam, err := NewIPAM(cidr)
+			Expect(err).To(BeNil())
+			a := ipam.Alloc(32)
+			Expect(a).To(Equal(alloc))
+			ipam.DeleteCIDRs(CIDRList{cidr})
+			Expect(ipam.PendingDeleted()).To(Equal(CIDRList{cidr}))
+			ipam.Free(a)
+			fmt.Printf("<<<<< %s\n", ipam.Ranges())
+			Expect(ipam.Ranges()).To(BeNil())
+			Expect(ipam.PendingDeleted()).To(BeNil())
+		})
+	})
+
 	Context("using complete blocks", func() {
 		_, cidr, _ := net.ParseCIDR("10.0.0.0/8")
 

@@ -305,6 +305,22 @@ func (this CIDRList) Additional(b CIDRList) CIDRList {
 	return a.additional(b)
 }
 
+func (this CIDRList) DiffTo(b CIDRList) (added CIDRList, deleted CIDRList) {
+	a := this.Copy()
+	b = b.Copy()
+	a.Normalize()
+	b.Normalize()
+	return a.additional(b), b.additional(a)
+}
+
+func (this CIDRList) Intersect(b CIDRList) CIDRList {
+	a := this.Copy()
+	b = b.Copy()
+	a.Normalize()
+	b.Normalize()
+	return a.additional(b).additional(b)
+}
+
 func (this *CIDRList) AddNormalized(list CIDRList) CIDRList {
 	toAdd := this.Additional(list)
 	this.Add(toAdd...)

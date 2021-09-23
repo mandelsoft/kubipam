@@ -85,9 +85,6 @@ func NewIPAM(cidr *net.IPNet, ranges ...*IPRange) (*IPAM, error) {
 
 func NewIPAMForRanges(ranges IPRanges) (*IPAM, error) {
 	var nextAlloc []net.IP
-	if len(ranges) == 0 {
-		return nil, fmt.Errorf("no ranges specified for IPAM")
-	}
 	cidrs, err := Includes(ranges...)
 	if err != nil {
 		return nil, err

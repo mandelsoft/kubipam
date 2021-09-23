@@ -115,6 +115,26 @@ var _ = Describe("CIDR", func() {
 		})
 	})
 
+	Context("cidr list intersect", func() {
+		a, _ := ParseCIDR("10.0.0.0/16")
+		b, _ := ParseCIDR("10.0.64.0/18")
+		c, _ := ParseCIDR("10.1.0.0/16")
+		d, _ := ParseCIDR("10.0.0.0/15")
+
+		It("normalize", func() {
+			l := CIDRList{a, b, c}
+			l.Normalize()
+			Expect(l).To(Equal(CIDRList{d}))
+		})
+		It("intersects middle", func() {
+			Expect(CIDRList{a}.Intersect(CIDRList{b})).To(Equal(CIDRList{b}))
+		})
+		It("intersects middle", func() {
+			l := CIDRList{a, b, c}
+			l.Normalize()
+			Expect(l.Intersect(CIDRList{b, c})).To(Equal(CIDRList{b, c}))
+		})
+	})
 	Context("cidr list delta", func() {
 		a, _ := ParseCIDR("10.9.0.0/16")
 		b, _ := ParseCIDR("10.192.0.0/16")
